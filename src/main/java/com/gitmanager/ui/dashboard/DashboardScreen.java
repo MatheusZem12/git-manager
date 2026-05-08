@@ -1,11 +1,9 @@
 package com.gitmanager.ui.dashboard;
 
 import com.gitmanager.model.GitProject;
-import com.gitmanager.model.User;
 import com.gitmanager.service.ProjectService;
 import com.gitmanager.ui.dialog.AddEditProjectDialog;
 import com.gitmanager.ui.dialog.GitOperationsPanel;
-import com.gitmanager.ui.login.LoginScreen;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -19,33 +17,29 @@ import javafx.scene.text.FontWeight;
 import javafx.stage.Stage;
 
 import java.util.List;
-import java.util.Optional;
+import java.util.stream.Collectors;
 
 public class DashboardScreen {
 
     private final Stage stage;
-    private final User currentUser;
     private final ProjectService projectService;
+    private final ObservableList<GitProject> projectList = FXCollections.observableArrayList();
 
-    private ObservableList<GitProject> projectList;
     private ListView<GitProject> listView;
     private Label statusLabel;
-    private SplitPane splitPane;
     private BorderPane detailArea;
 
-    public DashboardScreen(Stage stage, User currentUser) {
+    public DashboardScreen(Stage stage) {
         this.stage = stage;
-        this.currentUser = currentUser;
         this.projectService = new ProjectService();
-        this.projectList = FXCollections.observableArrayList();
     }
 
     public void show() {
-        stage.setTitle("Git Manager — " + currentUser.getUsername());
+        stage.setTitle("Git Manager");
         stage.setScene(buildScene());
         stage.setResizable(true);
-        stage.setMinWidth(900);
-        stage.setMinHeight(600);
+        stage.setMinWidth(960);
+        stage.setMinHeight(620);
         loadProjects();
     }
 
@@ -55,57 +49,30 @@ public class DashboardScreen {
         appTitle.setFont(Font.font("System", FontWeight.BOLD, 18));
         appTitle.setStyle("-fx-text-fill: white;");
 
-        Label userLabel = new Label("Olá, " + currentUser.getUsername());
-        userLabel.setStyle("-fx-text-fill: #bdc3c7; -fx-font-size: 13px;");
+        Button addBtn = new Button("+ Adicionar");
+        addBtn.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-size: 12px; -fx-cursor: hand;");
+        addBtn.setOnAction(e -> openAddDialog());
 
-        Button logoutBtn = new Button("Sair");
-        logoutBtn.setStyle("-fx-background-color: transparent; -fx-text-fill: #bdc3c7; " +
-                           "-fx-border-color: #bdc3c7; -fx-cursor: hand;");
-        logoutBtn.setOnAction(e -> logout());
+        Button refreshBtn = new Button("↻ Atualizar");
+        refreshBtn.setStyle("-fx-cursor: hand; -fx-font-size: 12px;");
+        refreshBtn.setOnAction(e -> loadProjects());
 
-        HBox header = new HBox(10, appTitle, new Spacer(), userLabel, logoutBtn);
+        HBox header = new HBox(10, appTitle, new Spacer(), refreshBtn, addBtn);
         header.setAlignment(Pos.CENTER_LEFT);
         header.setPadding(new Insets(12, 20, 12, 20));
         header.setStyle("-fx-background-color: #2c3e50;");
 
-        // ---- Painel esquerdo: lista de projetos ----
-        Label projectsTitle = new Label("Meus Repositórios");
-        projectsTitle.setFont(Font.font("System", FontWeight.BOLD, 14));
-
-        Button addBtn = new Button("+ Adicionar");
-        addBtn.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-cursor: hand;");
-        addBtn.setOnAction(e -> openAddDialog());
-
-        Button refreshBtn = new Button("↻");
-        refreshBtn.setTooltip(new Tooltip("Revalidar projetos"));
-        refreshBtn.setStyle("-fx-cursor: hand;");
-        refreshBtn.setOnAction(e -> loadProjects());
-
-        HBox listHeader = new HBox(8, projectsTitle, new Spacer(), refreshBtn, addBtn);
-        listHeader.setAlignment(Pos.CENTER_LEFT);
-        listHeader.setPadding(new Insets(10));
-
-        listView = new ListView<>(projectList);
-        listView.setCellFactory(lv -> new ProjectListCell());
-        listView.setPlaceholder(new Label("Nenhum repositório cadastrado.\nClique em '+ Adicionar' para começar."));
-        listView.getSelectionModel().selectedItemProperty().addListener(
-                (obs, old, selected) -> onProjectSelected(selected));
-
-        VBox leftPane = new VBox(0, listHeader, listView);
-        VBox.setVgrow(listView, Priority.ALWAYS);
-        leftPane.setMinWidth(280);
-        leftPane.setMaxWidth(360);
+        // ---- Painel esquerdo ----
+        VBox leftPane = buildLeftPane();
+        leftPane.setMinWidth(290);
+        leftPane.setMaxWidth(380);
 
         // ---- Painel direito: detalhe/operações ----
         detailArea = new BorderPane();
-        Label placeholder = new Label("Selecione um repositório\nna lista à esquerda.");
-        placeholder.setStyle("-fx-text-fill: #95a5a6; -fx-font-size: 15px;");
-        placeholder.setAlignment(Pos.CENTER);
-        detailArea.setCenter(placeholder);
+        showDetailPlaceholder();
 
-        // ---- SplitPane ----
-        splitPane = new SplitPane(leftPane, detailArea);
-        splitPane.setDividerPositions(0.3);
+        SplitPane splitPane = new SplitPane(leftPane, detailArea);
+        splitPane.setDividerPositions(0.30);
 
         // ---- Status bar ----
         statusLabel = new Label("Carregando repositórios...");
@@ -119,56 +86,108 @@ public class DashboardScreen {
         root.setCenter(splitPane);
         root.setBottom(statusBar);
 
-        return new Scene(root, 1100, 680);
+        return new Scene(root, 1150, 700);
     }
 
+    private VBox buildLeftPane() {
+        Label listTitle = new Label("Repositórios Git");
+        listTitle.setFont(Font.font("System", FontWeight.BOLD, 13));
+        listTitle.setStyle("-fx-text-fill: #2c3e50;");
+        listTitle.setPadding(new Insets(10, 10, 6, 10));
+
+        listView = new ListView<>(projectList);
+        listView.setCellFactory(lv -> new ProjectListCell());
+        listView.setPlaceholder(buildEmptyPlaceholder());
+        VBox.setVgrow(listView, Priority.ALWAYS);
+        listView.getSelectionModel().selectedItemProperty().addListener(
+                (obs, old, selected) -> {
+                    if (selected != null) {
+                        onProjectSelected(selected);
+                    }
+                });
+
+        ContextMenu ctx = new ContextMenu();
+        MenuItem removeItem = new MenuItem("Remover da lista");
+        removeItem.setOnAction(e -> {
+            GitProject selected = listView.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+                confirm.setTitle("Remover");
+                confirm.setHeaderText("Remover '" + selected.getName() + "'?");
+                confirm.setContentText("Isso apenas remove a entrada da lista local. O diretório no disco não será alterado.");
+                confirm.showAndWait().ifPresent(bt -> {
+                    if (bt == ButtonType.OK) {
+                        projectService.deleteProject(selected.getPath());
+                        loadProjects();
+                        detailArea.setCenter(null);
+                        showDetailPlaceholder();
+                    }
+                });
+            }
+        });
+        ctx.getItems().add(removeItem);
+        listView.setContextMenu(ctx);
+
+        VBox leftPane = new VBox(0, listTitle, listView);
+        VBox.setVgrow(listView, Priority.ALWAYS);
+        return leftPane;
+    }
+
+    private Label buildEmptyPlaceholder() {
+        Label lbl = new Label("Nenhum repositório cadastrado.\n\nClique em '+ Adicionar' para\ncadastrar um diretório git.");
+        lbl.setStyle("-fx-text-fill: #95a5a6; -fx-font-size: 12px; -fx-text-alignment: center;");
+        lbl.setAlignment(Pos.CENTER);
+        return lbl;
+    }
+
+    private void showDetailPlaceholder() {
+        Label placeholder = new Label("Selecione um repositório\nna lista à esquerda.");
+        placeholder.setStyle("-fx-text-fill: #95a5a6; -fx-font-size: 15px;");
+        placeholder.setAlignment(Pos.CENTER);
+        detailArea.setCenter(placeholder);
+    }
+
+    /** Carrega e valida projetos. */
     private void loadProjects() {
         statusLabel.setText("Validando repositórios no disco...");
         listView.setDisable(true);
 
         new Thread(() -> {
-            List<GitProject> projects = projectService.loadProjectsForCurrentMachine(currentUser);
+            List<GitProject> all = projectService.loadAllProjects();
             Platform.runLater(() -> {
-                projectList.setAll(projects);
+                projectList.setAll(all);
                 listView.setDisable(false);
-                long available = projects.stream().filter(GitProject::isAvailable).count();
-                statusLabel.setText(projects.size() + " projeto(s) cadastrado(s) — " +
-                        available + " disponível(is) neste PC.");
+                long available = all.stream().filter(GitProject::isAvailable).count();
+                statusLabel.setText(
+                    available + " disponível(is) de " + all.size() + " cadastrado(s)");
             });
         }).start();
     }
 
     private void onProjectSelected(GitProject project) {
         if (project == null) return;
-        GitOperationsPanel panel = new GitOperationsPanel(project, projectService, this::loadProjects, this::openEditDialog);
+        GitOperationsPanel panel = new GitOperationsPanel(
+                project, projectService, this::loadProjects, this::openEditDialog);
         detailArea.setCenter(panel.build());
     }
 
     private void openAddDialog() {
-        AddEditProjectDialog dialog = new AddEditProjectDialog(stage, currentUser, null, projectService);
-        Optional<GitProject> result = dialog.showAndWait();
-        result.ifPresent(p -> {
+        AddEditProjectDialog dialog = new AddEditProjectDialog(stage, null, projectService);
+        dialog.showAndWait().ifPresent(p -> {
             loadProjects();
-            // Selecionar o novo projeto
             Platform.runLater(() ->
                 projectList.stream()
-                    .filter(pr -> pr.getId().equals(p.getId()))
+                    .filter(pr -> pr.getPath().equals(p.getPath()))
                     .findFirst()
                     .ifPresent(pr -> listView.getSelectionModel().select(pr)));
         });
     }
 
     private void openEditDialog(GitProject project) {
-        AddEditProjectDialog dialog = new AddEditProjectDialog(stage, currentUser, project, projectService);
+        AddEditProjectDialog dialog = new AddEditProjectDialog(stage, project, projectService);
         dialog.showAndWait().ifPresent(updated -> loadProjects());
     }
 
-    private void logout() {
-        LoginScreen loginScreen = new LoginScreen(stage);
-        loginScreen.show();
-    }
-
-    // Spacer utilitário
     private static class Spacer extends Region {
         Spacer() { HBox.setHgrow(this, Priority.ALWAYS); }
     }

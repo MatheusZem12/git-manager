@@ -22,19 +22,15 @@ public class ProjectListCell extends ListCell<GitProject> {
             return;
         }
 
-        // Indicador de status (círculo colorido)
         Circle statusDot = new Circle(6);
         if (!project.isExistsOnDisk()) {
             statusDot.setFill(Color.web("#e74c3c")); // vermelho = não existe
         } else if (!project.isHasGit()) {
             statusDot.setFill(Color.web("#e67e22")); // laranja = sem git
-        } else if (!project.isRemoteUrlMatches()) {
-            statusDot.setFill(Color.web("#f1c40f")); // amarelo = remote divergente
         } else {
             statusDot.setFill(Color.web("#27ae60")); // verde = OK
         }
 
-        // Nome e branch
         Label nameLabel = new Label(project.getName());
         nameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 13px;");
 
