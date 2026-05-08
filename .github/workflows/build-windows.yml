@@ -1,0 +1,39 @@
+name: Build Windows Installer (.exe)
+
+on:
+  push:
+    branches: [DEV, main]
+  pull_request:
+    branches: [DEV, main]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17 with JavaFX (Liberica)
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'liberica'
+          java-package: jdk+fx
+          cache: maven
+
+      - name: Build and package .exe
+        run: mvn clean package -Pwindows --batch-mode
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: git-manager-windows-installer
+          path: target/dist/*.exe
+
+      - name: Upload app-image artifact (portable folder)
+        uses: actions/upload-artifact@v4
+        with:
+          name: git-manager-windows-portable
+          path: target/dist/GitManager/
