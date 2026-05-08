@@ -26,6 +26,49 @@ mvn package
 java -jar target/git-manager-1.0.0.jar
 ```
 
+## Gerar instalador .exe (Windows)
+
+O projeto usa o `jpackage` (ferramenta do JDK) para criar um instalador `.exe` nativo para Windows.
+
+### Opção 1: GitHub Actions (recomendado)
+
+A cada push na branch `DEV` ou `main`, o workflow [`.github/workflows/build-windows.yml`](.github/workflows/build-windows.yml) executa automaticamente no Windows e gera o instalador como artefato para download.
+
+**Como baixar:**
+1. Vá na aba **Actions** do repositório no GitHub
+2. Clique no workflow mais recente
+3. Baixe o artefato `git-manager-windows-installer`
+
+### Opção 2: Build local no Windows
+
+1. Instale o JDK 17 com JavaFX incluso (recomendado: [BellSoft Liberica JDK Full](https://bell-sw.com/pages/downloads/#/java-17-lts))
+2. Clone o repositório
+3. Execute:
+
+```bash
+mvn clean package -Pwindows
+```
+
+O instalador `.exe` será gerado em:
+
+```
+target/dist/GitManager-1.0.0.exe
+```
+
+> **Nota:** o `jpackage` no Windows pode exigir o [WiX Toolset v3](https://wixtoolset.org/docs/v3/) instalado para gerar o `.exe`.
+
+### Opção 3: Outras plataformas (Linux/Mac)
+
+Para gerar um instalador nativo no Linux ou Mac:
+
+```bash
+mvn clean package -Pjpackage
+```
+
+O tipo de instalador depende do SO:
+- **Linux:** `.deb` ou `.rpm`
+- **Mac:** `.dmg` ou `.pkg`
+
 ## Funcionalidades
 
 ### Gerenciamento de repositórios
