@@ -1,7 +1,6 @@
 package com.gitmanager.ui.dialog;
 
 import com.gitmanager.model.GitProject;
-import com.gitmanager.model.User;
 import com.gitmanager.service.ProjectService;
 import javafx.geometry.Insets;
 import javafx.scene.control.*;
@@ -11,14 +10,12 @@ import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.DirectoryChooser;
 import javafx.stage.Stage;
-import javafx.stage.Window;
 
 import java.io.File;
 
 public class AddEditProjectDialog extends Dialog<GitProject> {
 
-    private final User currentUser;
-    private final GitProject existing; // null = modo adição
+    private final GitProject existing;
     private final ProjectService projectService;
     private final Stage ownerStage;
 
@@ -27,10 +24,8 @@ public class AddEditProjectDialog extends Dialog<GitProject> {
     private TextArea notesArea;
     private Label errorLabel;
 
-    public AddEditProjectDialog(Stage owner, User currentUser,
-                                GitProject existing, ProjectService projectService) {
+    public AddEditProjectDialog(Stage owner, GitProject existing, ProjectService projectService) {
         this.ownerStage = owner;
-        this.currentUser = currentUser;
         this.existing = existing;
         this.projectService = projectService;
 
@@ -54,6 +49,9 @@ public class AddEditProjectDialog extends Dialog<GitProject> {
         pathField = new TextField(isEdit ? existing.getPath() : "");
         pathField.setPromptText("Caminho absoluto do diretório");
         pathField.setPrefWidth(310);
+        if (isEdit) {
+            pathField.setDisable(true); // path é a chave, não permite editar
+        }
 
         Button browseBtn = new Button("Procurar...");
         browseBtn.setStyle("-fx-cursor: hand;");
@@ -69,6 +67,9 @@ public class AddEditProjectDialog extends Dialog<GitProject> {
                 pathField.setText(selected.getAbsolutePath());
             }
         });
+        if (isEdit) {
+            browseBtn.setDisable(true);
+        }
 
         notesArea = new TextArea(isEdit && existing.getNotes() != null ? existing.getNotes() : "");
         notesArea.setPromptText("Observações opcionais sobre este projeto...");
@@ -90,7 +91,6 @@ public class AddEditProjectDialog extends Dialog<GitProject> {
         grid.add(new Label("Notas:"), 0, 2);
         grid.add(notesArea, 1, 2, 2, 1);
 
-        // Aviso sobre validação
         Label hint = new Label("O diretório será validado: deve existir e conter um .git válido.");
         hint.setStyle("-fx-text-fill: #7f8c8d; -fx-font-size: 11px;");
 
@@ -119,7 +119,6 @@ public class AddEditProjectDialog extends Dialog<GitProject> {
             errorLabel.setText("Selecione o diretório do repositório.");
             return false;
         }
-        // Valida se existe .git
         if (!projectService.getGitService().isValidGitRepo(pathField.getText().trim())) {
             errorLabel.setText("O diretório selecionado não é um repositório Git válido (não contém .git).");
             return false;
@@ -131,20 +130,13 @@ public class AddEditProjectDialog extends Dialog<GitProject> {
         if (type.getButtonData() != ButtonBar.ButtonData.OK_DONE) return null;
         try {
             if (existing == null) {
-                // Adição
                 return projectService.addProject(
-                        currentUser,
                         nameField.getText().trim(),
                         pathField.getText().trim(),
                         notesArea.getText().trim());
             } else {
-                // Edição
                 existing.setName(nameField.getText().trim());
-                existing.setPath(pathField.getText().trim());
                 existing.setNotes(notesArea.getText().trim());
-                // Atualiza remote URL ao alterar path
-                String newRemote = projectService.getGitService().getRemoteOriginUrl(existing.getPath());
-                existing.setRemoteUrl(newRemote);
                 return projectService.updateProject(existing);
             }
         } catch (IllegalArgumentException e) {

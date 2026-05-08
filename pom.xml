@@ -9,7 +9,7 @@
     <version>1.0.0</version>
     <packaging>jar</packaging>
     <name>Git Manager</name>
-    <description>Gerenciador de projetos Git com interface gráfica</description>
+    <description>Gerenciador local de repositórios Git com interface gráfica</description>
 
     <properties>
         <maven.compiler.source>17</maven.compiler.source>
@@ -17,11 +17,8 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <javafx.version>21.0.2</javafx.version>
         <jgit.version>6.8.0.202311291450-r</jgit.version>
-        <postgresql.version>42.7.3</postgresql.version>
-        <bcrypt.version>0.10.2</bcrypt.version>
         <slf4j.version>2.0.11</slf4j.version>
         <logback.version>1.4.14</logback.version>
-        <hikari.version>5.1.0</hikari.version>
         <junit.version>5.10.2</junit.version>
     </properties>
 
@@ -43,27 +40,6 @@
             <groupId>org.eclipse.jgit</groupId>
             <artifactId>org.eclipse.jgit</artifactId>
             <version>${jgit.version}</version>
-        </dependency>
-
-        <!-- PostgreSQL Driver -->
-        <dependency>
-            <groupId>org.postgresql</groupId>
-            <artifactId>postgresql</artifactId>
-            <version>${postgresql.version}</version>
-        </dependency>
-
-        <!-- HikariCP - Connection Pool -->
-        <dependency>
-            <groupId>com.zaxxer</groupId>
-            <artifactId>HikariCP</artifactId>
-            <version>${hikari.version}</version>
-        </dependency>
-
-        <!-- BCrypt para hash de senhas -->
-        <dependency>
-            <groupId>at.favre.lib</groupId>
-            <artifactId>bcrypt</artifactId>
-            <version>${bcrypt.version}</version>
         </dependency>
 
         <!-- Logging -->

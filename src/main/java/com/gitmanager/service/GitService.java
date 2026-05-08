@@ -45,7 +45,6 @@ public class GitService {
 
     /**
      * Obtém a URL do remote 'origin' do repositório.
-     * @return URL ou null se não existir remote.
      */
     public String getRemoteOriginUrl(String path) {
         try (Repository repo = openRepo(path)) {
@@ -73,20 +72,18 @@ public class GitService {
     }
 
     /**
-     * Retorna um resumo do status do repositório (arquivos modificados/staged/untracked).
+     * Retorna um resumo do status do repositório.
      */
     public String getStatusSummary(String path) {
         try (Git git = openGit(path)) {
             if (git == null) return "Inacessível";
             Status status = git.status().call();
-            List<String> parts = new ArrayList<>();
             int modified = status.getModified().size() + status.getMissing().size()
                          + status.getUntracked().size() + status.getAdded().size()
                          + status.getChanged().size() + status.getRemoved().size()
                          + status.getConflicting().size();
-            if (modified > 0) parts.add(modified + " alteração(ões)");
-            if (status.isClean()) parts.add("Limpo");
-            return parts.isEmpty() ? "Limpo" : String.join(", ", parts);
+            if (modified > 0) return modified + " alteração(ões)";
+            return "Limpo";
         } catch (Exception e) {
             log.debug("Erro ao obter status do repo '{}': {}", path, e.getMessage());
             return "Erro";
@@ -148,8 +145,6 @@ public class GitService {
 
     /**
      * Executa git add + commit.
-     * @param message Mensagem do commit.
-     * @param addAll  Se true, faz 'git add -A' antes.
      */
     public String commit(String path, String message, boolean addAll,
                          String authorName, String authorEmail) {
@@ -158,12 +153,15 @@ public class GitService {
             if (addAll) {
                 git.add().addFilepattern(".").call();
             }
-            RevCommit commit = git.commit()
-                    .setMessage(message)
-                    .setAuthor(authorName, authorEmail)
-                    .setAllowEmpty(false)
-                    .call();
-            return "Commit realizado: " + commit.abbreviate(7).name() + " - " + commit.getShortMessage();
+
+            CommitCommand commitCmd = git.commit().setMessage(message).setAllowEmpty(false);
+            if (authorName != null && !authorName.isBlank()
+                    && authorEmail != null && !authorEmail.isBlank()) {
+                commitCmd.setAuthor(authorName, authorEmail);
+            }
+
+            RevCommit commit = commitCmd.call();
+            return "Commit realizado: " + commit.abbreviate(7).name() + " – " + commit.getShortMessage();
         } catch (GitAPIException e) {
             log.error("Erro no commit de '{}': {}", path, e.getMessage());
             return "Erro no commit: " + e.getMessage();
@@ -265,7 +263,7 @@ public class GitService {
     }
 
     /**
-     * Valida se o repositório possui remote e se a URL bate com a cadastrada no BD.
+     * Valida o projeto contra o filesystem atual.
      */
     public void validateProject(GitProject project) {
         boolean existsOnDisk = Files.isDirectory(Path.of(project.getPath()));
@@ -273,7 +271,6 @@ public class GitService {
 
         if (!existsOnDisk) {
             project.setHasGit(false);
-            project.setRemoteUrlMatches(false);
             project.setCurrentBranch("N/A");
             project.setStatusSummary("Diretório não encontrado");
             return;
@@ -283,7 +280,6 @@ public class GitService {
         project.setHasGit(hasGit);
 
         if (!hasGit) {
-            project.setRemoteUrlMatches(false);
             project.setCurrentBranch("N/A");
             project.setStatusSummary("Sem repositório git");
             return;
@@ -291,19 +287,6 @@ public class GitService {
 
         project.setCurrentBranch(getCurrentBranch(project.getPath()));
         project.setStatusSummary(getStatusSummary(project.getPath()));
-
-        String storedRemote = project.getRemoteUrl();
-        String actualRemote = getRemoteOriginUrl(project.getPath());
-
-        if (storedRemote == null || storedRemote.isBlank()) {
-            // Sem remote cadastrado no BD — não há o que validar
-            project.setRemoteUrlMatches(true);
-        } else {
-            // Ambos existem: compara sem trailing slash e case-insensitive
-            String normalized = storedRemote.trim().replaceAll("/$", "");
-            String actualNorm = actualRemote != null ? actualRemote.trim().replaceAll("/$", "") : "";
-            project.setRemoteUrlMatches(normalized.equalsIgnoreCase(actualNorm));
-        }
     }
 
     // ----- Helpers privados -----

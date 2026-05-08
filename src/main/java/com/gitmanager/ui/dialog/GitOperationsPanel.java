@@ -36,7 +36,6 @@ public class GitOperationsPanel {
     }
 
     public Node build() {
-        // ---- Cabeçalho do projeto ----
         Label nameLabel = new Label(project.getName());
         nameLabel.setFont(Font.font("System", FontWeight.BOLD, 20));
 
@@ -44,7 +43,6 @@ public class GitOperationsPanel {
         pathLabel.setStyle("-fx-text-fill: #7f8c8d; -fx-font-size: 12px;");
         pathLabel.setWrapText(true);
 
-        // Status badge
         Label statusBadge = buildStatusBadge();
 
         Button editBtn = new Button("Editar");
@@ -61,11 +59,6 @@ public class GitOperationsPanel {
         if (!project.isAvailable()) {
             return buildUnavailableView(header);
         }
-
-        // ---- Área de operações (só se disponível) ----
-
-        // Remote warning
-        VBox remoteWarning = buildRemoteWarning();
 
         // Branch selector
         branchCombo = new ComboBox<>();
@@ -90,8 +83,11 @@ public class GitOperationsPanel {
         Button pushBtn = buildOpBtn("Push ↑", "#2980b9", e -> doGitOp("push"));
         Button pullBtn = buildOpBtn("Pull ↓", "#27ae60", e -> doGitOp("pull"));
         Button fetchBtn = buildOpBtn("Fetch", "#7f8c8d", e -> doGitOp("fetch"));
+        Button clearBtn = new Button("Limpar");
+        clearBtn.setStyle("-fx-cursor: hand;");
+        clearBtn.setOnAction(e -> { if (outputArea != null) outputArea.clear(); });
 
-        HBox syncRow = new HBox(10, pushBtn, pullBtn, fetchBtn);
+        HBox syncRow = new HBox(10, pushBtn, pullBtn, fetchBtn, new Spacer(), clearBtn);
         syncRow.setAlignment(Pos.CENTER_LEFT);
 
         // Commits recentes
@@ -107,7 +103,6 @@ public class GitOperationsPanel {
         TitledPane notesPane = buildNotesPane();
 
         VBox content = new VBox(12,
-                remoteWarning,
                 branchRow,
                 new Separator(),
                 syncRow,
@@ -136,8 +131,6 @@ public class GitOperationsPanel {
             text = "Não encontrado"; color = "#e74c3c";
         } else if (!project.isHasGit()) {
             text = "Sem git"; color = "#e67e22";
-        } else if (!project.isRemoteUrlMatches()) {
-            text = "Remote divergente"; color = "#f39c12";
         } else {
             text = "OK"; color = "#27ae60";
         }
@@ -145,21 +138,6 @@ public class GitOperationsPanel {
         badge.setStyle("-fx-background-color: " + color + "; -fx-text-fill: white; " +
                        "-fx-padding: 2 8 2 8; -fx-background-radius: 10; -fx-font-size: 11px;");
         return badge;
-    }
-
-    private VBox buildRemoteWarning() {
-        VBox box = new VBox();
-        if (project.getRemoteUrl() != null && !project.isRemoteUrlMatches()) {
-            String actual = gitService.getRemoteOriginUrl(project.getPath());
-            Label warn = new Label("⚠ O remote 'origin' neste PC é diferente do cadastrado.\n" +
-                    "Cadastrado: " + project.getRemoteUrl() + "\n" +
-                    "Atual:      " + (actual != null ? actual : "nenhum"));
-            warn.setWrapText(true);
-            warn.setStyle("-fx-background-color: #fef9e7; -fx-border-color: #f39c12; " +
-                          "-fx-border-width: 1; -fx-padding: 8; -fx-font-size: 12px;");
-            box.getChildren().add(warn);
-        }
-        return box;
     }
 
     private Node buildUnavailableView(VBox header) {
@@ -172,7 +150,13 @@ public class GitOperationsPanel {
         msg.setAlignment(Pos.CENTER);
         Button editBtn = new Button("Editar projeto");
         editBtn.setOnAction(e -> onEdit.accept(project));
-        VBox center = new VBox(16, msg, editBtn);
+        Button removeBtn = new Button("Remover da lista");
+        removeBtn.setStyle("-fx-background-color: #c0392b; -fx-text-fill: white;");
+        removeBtn.setOnAction(e -> {
+            projectService.deleteProject(project.getPath());
+            onRefresh.run();
+        });
+        VBox center = new VBox(16, msg, editBtn, removeBtn);
         center.setAlignment(Pos.CENTER);
         center.setPadding(new Insets(40));
         BorderPane root = new BorderPane();
@@ -305,18 +289,34 @@ public class GitOperationsPanel {
     }
 
     private void doGitOp(String op) {
-        // Para push/pull/fetch que podem precisar de credenciais
-        Dialog<String[]> credDialog = buildCredentialDialog();
-        credDialog.showAndWait().ifPresent(creds -> {
-            String user = creds[0];
-            String pass = creds[1];
-            runAsync(() -> switch (op) {
-                case "push" -> gitService.push(project.getPath(), user, pass);
-                case "pull" -> gitService.pull(project.getPath(), user, pass);
-                case "fetch" -> gitService.fetch(project.getPath(), user, pass);
-                default -> "Operação desconhecida.";
-            });
+        Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        alert.setTitle("Credenciais (opcional)");
+        alert.setHeaderText("Usar credenciais HTTP?");
+        alert.setContentText("Deixe em branco para usar SSH ou o gerenciador de credenciais do sistema.");
+
+        ButtonType withCreds = new ButtonType("Informar credenciais");
+        ButtonType withoutCreds = new ButtonType("Usar SSH / padrão", ButtonBar.ButtonData.OK_DONE);
+        ButtonType cancel = ButtonType.CANCEL;
+        alert.getButtonTypes().setAll(withoutCreds, withCreds, cancel);
+
+        alert.showAndWait().ifPresent(bt -> {
+            if (bt == cancel) return;
+            if (bt == withCreds) {
+                buildCredentialDialog().showAndWait().ifPresent(creds ->
+                    runAsync(() -> execOp(op, creds[0], creds[1])));
+            } else {
+                runAsync(() -> execOp(op, null, null));
+            }
         });
+    }
+
+    private String execOp(String op, String user, String pass) {
+        return switch (op) {
+            case "push"  -> gitService.push(project.getPath(), user, pass);
+            case "pull"  -> gitService.pull(project.getPath(), user, pass);
+            case "fetch" -> gitService.fetch(project.getPath(), user, pass);
+            default -> "Operação desconhecida.";
+        };
     }
 
     private Dialog<String[]> buildCredentialDialog() {
