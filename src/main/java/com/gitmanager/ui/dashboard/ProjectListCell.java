@@ -1,6 +1,7 @@
 package com.gitmanager.ui.dashboard;
 
 import com.gitmanager.model.GitProject;
+import com.gitmanager.ui.theme.ThemeManager;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.control.Label;
@@ -22,6 +23,8 @@ public class ProjectListCell extends ListCell<GitProject> {
             return;
         }
 
+        boolean dark = ThemeManager.isDark();
+
         Circle statusDot = new Circle(6);
         if (!project.isExistsOnDisk()) {
             statusDot.setFill(Color.web("#e74c3c")); // vermelho = não existe
@@ -35,7 +38,7 @@ public class ProjectListCell extends ListCell<GitProject> {
         nameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 13px;");
 
         Label branchLabel = new Label(buildSubtitle(project));
-        branchLabel.setStyle("-fx-text-fill: #7f8c8d; -fx-font-size: 11px;");
+        branchLabel.getStyleClass().add("gm-subtitle-label");
 
         VBox text = new VBox(2, nameLabel, branchLabel);
         VBox.setVgrow(text, Priority.ALWAYS);

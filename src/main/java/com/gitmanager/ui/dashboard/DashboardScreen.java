@@ -4,6 +4,7 @@ import com.gitmanager.model.GitProject;
 import com.gitmanager.service.ProjectService;
 import com.gitmanager.ui.dialog.AddEditProjectDialog;
 import com.gitmanager.ui.dialog.GitOperationsPanel;
+import com.gitmanager.ui.theme.ThemeManager;
 import javafx.application.Platform;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -17,7 +18,6 @@ import javafx.scene.text.FontWeight;
 import javafx.stage.Stage;
 
 import java.util.List;
-import java.util.stream.Collectors;
 
 public class DashboardScreen {
 
@@ -28,6 +28,7 @@ public class DashboardScreen {
     private ListView<GitProject> listView;
     private Label statusLabel;
     private BorderPane detailArea;
+    private Scene scene;
 
     public DashboardScreen(Stage stage) {
         this.stage = stage;
@@ -36,7 +37,9 @@ public class DashboardScreen {
 
     public void show() {
         stage.setTitle("Git Manager");
-        stage.setScene(buildScene());
+        scene = buildScene();
+        ThemeManager.registerScene(scene);
+        stage.setScene(scene);
         stage.setResizable(true);
         stage.setMinWidth(960);
         stage.setMinHeight(620);
@@ -47,20 +50,29 @@ public class DashboardScreen {
         // ---- Cabeçalho ----
         Label appTitle = new Label("Git Manager");
         appTitle.setFont(Font.font("System", FontWeight.BOLD, 18));
-        appTitle.setStyle("-fx-text-fill: white;");
+        appTitle.getStyleClass().add("gm-header-label");
+
+        Button themeBtn = new Button(ThemeManager.isDark() ? "☀ Claro" : "☾ Escuro");
+        themeBtn.setOnAction(e -> {
+            ThemeManager.toggle();
+            themeBtn.setText(ThemeManager.isDark() ? "☀ Claro" : "☾ Escuro");
+            GitProject selected = listView.getSelectionModel().getSelectedItem();
+            if (selected != null) {
+                onProjectSelected(selected);
+            }
+        });
 
         Button addBtn = new Button("+ Adicionar");
-        addBtn.setStyle("-fx-background-color: #27ae60; -fx-text-fill: white; -fx-font-size: 12px; -fx-cursor: hand;");
+        addBtn.getStyleClass().add("gm-btn-success");
         addBtn.setOnAction(e -> openAddDialog());
 
         Button refreshBtn = new Button("↻ Atualizar");
-        refreshBtn.setStyle("-fx-cursor: hand; -fx-font-size: 12px;");
         refreshBtn.setOnAction(e -> loadProjects());
 
-        HBox header = new HBox(10, appTitle, new Spacer(), refreshBtn, addBtn);
+        HBox header = new HBox(10, appTitle, new Spacer(), themeBtn, refreshBtn, addBtn);
         header.setAlignment(Pos.CENTER_LEFT);
         header.setPadding(new Insets(12, 20, 12, 20));
-        header.setStyle("-fx-background-color: #2c3e50;");
+        header.getStyleClass().add("gm-header");
 
         // ---- Painel esquerdo ----
         VBox leftPane = buildLeftPane();
@@ -76,10 +88,10 @@ public class DashboardScreen {
 
         // ---- Status bar ----
         statusLabel = new Label("Carregando repositórios...");
-        statusLabel.setStyle("-fx-text-fill: #7f8c8d; -fx-font-size: 11px;");
+        statusLabel.getStyleClass().add("gm-status-label");
         HBox statusBar = new HBox(statusLabel);
         statusBar.setPadding(new Insets(4, 10, 4, 10));
-        statusBar.setStyle("-fx-background-color: #ecf0f1; -fx-border-color: #bdc3c7; -fx-border-width: 1 0 0 0;");
+        statusBar.getStyleClass().add("gm-status-bar");
 
         BorderPane root = new BorderPane();
         root.setTop(header);
@@ -92,7 +104,6 @@ public class DashboardScreen {
     private VBox buildLeftPane() {
         Label listTitle = new Label("Repositórios Git");
         listTitle.setFont(Font.font("System", FontWeight.BOLD, 13));
-        listTitle.setStyle("-fx-text-fill: #2c3e50;");
         listTitle.setPadding(new Insets(10, 10, 6, 10));
 
         listView = new ListView<>(projectList);
@@ -112,6 +123,7 @@ public class DashboardScreen {
             GitProject selected = listView.getSelectionModel().getSelectedItem();
             if (selected != null) {
                 Alert confirm = new Alert(Alert.AlertType.CONFIRMATION);
+                ThemeManager.applyToDialog(confirm);
                 confirm.setTitle("Remover");
                 confirm.setHeaderText("Remover '" + selected.getName() + "'?");
                 confirm.setContentText("Isso apenas remove a entrada da lista local. O diretório no disco não será alterado.");
@@ -135,14 +147,14 @@ public class DashboardScreen {
 
     private Label buildEmptyPlaceholder() {
         Label lbl = new Label("Nenhum repositório cadastrado.\n\nClique em '+ Adicionar' para\ncadastrar um diretório git.");
-        lbl.setStyle("-fx-text-fill: #95a5a6; -fx-font-size: 12px; -fx-text-alignment: center;");
+        lbl.getStyleClass().add("gm-placeholder");
         lbl.setAlignment(Pos.CENTER);
         return lbl;
     }
 
     private void showDetailPlaceholder() {
         Label placeholder = new Label("Selecione um repositório\nna lista à esquerda.");
-        placeholder.setStyle("-fx-text-fill: #95a5a6; -fx-font-size: 15px;");
+        placeholder.getStyleClass().add("gm-placeholder");
         placeholder.setAlignment(Pos.CENTER);
         detailArea.setCenter(placeholder);
     }
@@ -173,6 +185,7 @@ public class DashboardScreen {
 
     private void openAddDialog() {
         AddEditProjectDialog dialog = new AddEditProjectDialog(stage, null, projectService);
+        ThemeManager.applyToDialog(dialog);
         dialog.showAndWait().ifPresent(p -> {
             loadProjects();
             Platform.runLater(() ->
@@ -185,6 +198,7 @@ public class DashboardScreen {
 
     private void openEditDialog(GitProject project) {
         AddEditProjectDialog dialog = new AddEditProjectDialog(stage, project, projectService);
+        ThemeManager.applyToDialog(dialog);
         dialog.showAndWait().ifPresent(updated -> loadProjects());
     }
 
