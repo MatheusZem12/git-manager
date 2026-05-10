@@ -2,6 +2,7 @@ package com.gitmanager.ui.dialog;
 
 import com.gitmanager.model.GitProject;
 import com.gitmanager.service.ProjectService;
+import com.gitmanager.ui.theme.ThemeManager;
 import javafx.geometry.Insets;
 import javafx.scene.control.*;
 import javafx.scene.layout.GridPane;
@@ -21,7 +22,6 @@ public class AddEditProjectDialog extends Dialog<GitProject> {
 
     private TextField nameField;
     private TextField pathField;
-    private TextArea notesArea;
     private Label errorLabel;
 
     public AddEditProjectDialog(Stage owner, GitProject existing, ProjectService projectService) {
@@ -34,6 +34,8 @@ public class AddEditProjectDialog extends Dialog<GitProject> {
         setHeaderText(null);
         buildContent();
         setResultConverter(this::handleResult);
+
+        ThemeManager.applyToDialog(this);
     }
 
     private void buildContent() {
@@ -54,7 +56,6 @@ public class AddEditProjectDialog extends Dialog<GitProject> {
         }
 
         Button browseBtn = new Button("Procurar...");
-        browseBtn.setStyle("-fx-cursor: hand;");
         browseBtn.setOnAction(e -> {
             DirectoryChooser chooser = new DirectoryChooser();
             chooser.setTitle("Selecionar diretório do repositório Git");
@@ -71,12 +72,8 @@ public class AddEditProjectDialog extends Dialog<GitProject> {
             browseBtn.setDisable(true);
         }
 
-        notesArea = new TextArea(isEdit && existing.getNotes() != null ? existing.getNotes() : "");
-        notesArea.setPromptText("Observações opcionais sobre este projeto...");
-        notesArea.setPrefRowCount(4);
-
         errorLabel = new Label();
-        errorLabel.setStyle("-fx-text-fill: #e74c3c; -fx-font-size: 12px;");
+        errorLabel.getStyleClass().add("gm-error-label");
         errorLabel.setWrapText(true);
         errorLabel.setMaxWidth(400);
 
@@ -88,11 +85,8 @@ public class AddEditProjectDialog extends Dialog<GitProject> {
         grid.add(new Label("Diretório:"), 0, 1);
         grid.add(pathField, 1, 1);
         grid.add(browseBtn, 2, 1);
-        grid.add(new Label("Notas:"), 0, 2);
-        grid.add(notesArea, 1, 2, 2, 1);
-
         Label hint = new Label("O diretório será validado: deve existir e conter um .git válido.");
-        hint.setStyle("-fx-text-fill: #7f8c8d; -fx-font-size: 11px;");
+        hint.getStyleClass().add("gm-hint-label");
 
         VBox content = new VBox(14, title, grid, hint, errorLabel);
         content.setPadding(new Insets(20));
@@ -133,10 +127,10 @@ public class AddEditProjectDialog extends Dialog<GitProject> {
                 return projectService.addProject(
                         nameField.getText().trim(),
                         pathField.getText().trim(),
-                        notesArea.getText().trim());
+                        "");
             } else {
                 existing.setName(nameField.getText().trim());
-                existing.setNotes(notesArea.getText().trim());
+                existing.setNotes("");
                 return projectService.updateProject(existing);
             }
         } catch (IllegalArgumentException e) {

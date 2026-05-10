@@ -3,6 +3,8 @@ package com.gitmanager.ui.dialog;
 import com.gitmanager.model.GitProject;
 import com.gitmanager.service.GitService;
 import com.gitmanager.service.ProjectService;
+import com.gitmanager.ui.theme.ThemeManager;
+import com.gitmanager.ui.timeline.GitTimelinePanel;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -25,6 +27,7 @@ public class GitOperationsPanel {
 
     private TextArea outputArea;
     private ComboBox<String> branchCombo;
+    private StagingPanel stagingPanel;
 
     public GitOperationsPanel(GitProject project, ProjectService projectService,
                               Runnable onRefresh, Consumer<GitProject> onEdit) {
@@ -40,13 +43,12 @@ public class GitOperationsPanel {
         nameLabel.setFont(Font.font("System", FontWeight.BOLD, 20));
 
         Label pathLabel = new Label(project.getPath());
-        pathLabel.setStyle("-fx-text-fill: #7f8c8d; -fx-font-size: 12px;");
+        pathLabel.getStyleClass().add("gm-path-label");
         pathLabel.setWrapText(true);
 
         Label statusBadge = buildStatusBadge();
 
         Button editBtn = new Button("Editar");
-        editBtn.setStyle("-fx-cursor: hand;");
         editBtn.setOnAction(e -> onEdit.accept(project));
 
         HBox titleRow = new HBox(10, nameLabel, statusBadge, new Spacer(), editBtn);
@@ -54,89 +56,40 @@ public class GitOperationsPanel {
 
         VBox header = new VBox(4, titleRow, pathLabel);
         header.setPadding(new Insets(14, 16, 10, 16));
-        header.setStyle("-fx-background-color: #f8f9fa; -fx-border-color: #dee2e6; -fx-border-width: 0 0 1 0;");
+        header.getStyleClass().add("gm-surface-header");
 
         if (!project.isAvailable()) {
             return buildUnavailableView(header);
         }
 
-        // Branch selector
-        branchCombo = new ComboBox<>();
-        refreshBranches();
-        branchCombo.setPrefWidth(200);
+        TabPane mainTabs = new TabPane();
+        mainTabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
 
-        Button checkoutBtn = new Button("Checkout");
-        checkoutBtn.setStyle("-fx-cursor: hand; -fx-background-color: #8e44ad; -fx-text-fill: white;");
-        checkoutBtn.setOnAction(e -> doCheckout());
+        Tab overviewTab = new Tab("Visão Geral", buildOverviewTab());
+        Tab historyTab = new Tab("Histórico", buildHistoryTab());
+        Tab tagsTab = new Tab("Tags", buildTagsTab());
+        Tab stashTab = new Tab("Stash", buildStashTab());
 
-        Button newBranchBtn = new Button("Nova Branch");
-        newBranchBtn.setStyle("-fx-cursor: hand;");
-        newBranchBtn.setOnAction(e -> doNewBranch());
-
-        HBox branchRow = new HBox(8, new Label("Branch:"), branchCombo, checkoutBtn, newBranchBtn);
-        branchRow.setAlignment(Pos.CENTER_LEFT);
-
-        // Commit section
-        TitledPane commitPane = buildCommitPane();
-
-        // Push / Pull / Fetch buttons
-        Button pushBtn = buildOpBtn("Push ↑", "#2980b9", e -> doGitOp("push"));
-        Button pullBtn = buildOpBtn("Pull ↓", "#27ae60", e -> doGitOp("pull"));
-        Button fetchBtn = buildOpBtn("Fetch", "#7f8c8d", e -> doGitOp("fetch"));
-        Button clearBtn = new Button("Limpar");
-        clearBtn.setStyle("-fx-cursor: hand;");
-        clearBtn.setOnAction(e -> { if (outputArea != null) outputArea.clear(); });
-
-        HBox syncRow = new HBox(10, pushBtn, pullBtn, fetchBtn, new Spacer(), clearBtn);
-        syncRow.setAlignment(Pos.CENTER_LEFT);
-
-        // Commits recentes
-        TitledPane logPane = buildLogPane();
-
-        // Output area
-        outputArea = new TextArea();
-        outputArea.setEditable(false);
-        outputArea.setPrefHeight(120);
-        outputArea.setStyle("-fx-font-family: monospace; -fx-font-size: 12px; -fx-background-color: #1e1e1e; -fx-text-fill: #d4d4d4;");
-
-        // Notas
-        TitledPane notesPane = buildNotesPane();
-
-        VBox content = new VBox(12,
-                branchRow,
-                new Separator(),
-                syncRow,
-                new Separator(),
-                commitPane,
-                logPane,
-                new Label("Saída das operações:"),
-                outputArea,
-                notesPane);
-        content.setPadding(new Insets(14, 16, 16, 16));
-
-        ScrollPane scroll = new ScrollPane(content);
-        scroll.setFitToWidth(true);
-        scroll.setStyle("-fx-background-color: transparent;");
+        mainTabs.getTabs().addAll(overviewTab, historyTab, tagsTab, stashTab);
 
         BorderPane root = new BorderPane();
         root.setTop(header);
-        root.setCenter(scroll);
+        root.setCenter(mainTabs);
         return root;
     }
 
     private Label buildStatusBadge() {
         String text;
-        String color;
+        String styleClass;
         if (!project.isExistsOnDisk()) {
-            text = "Não encontrado"; color = "#e74c3c";
+            text = "Não encontrado"; styleClass = "gm-badge-error";
         } else if (!project.isHasGit()) {
-            text = "Sem git"; color = "#e67e22";
+            text = "Sem git"; styleClass = "gm-badge-warn";
         } else {
-            text = "OK"; color = "#27ae60";
+            text = "OK"; styleClass = "gm-badge-ok";
         }
         Label badge = new Label(text);
-        badge.setStyle("-fx-background-color: " + color + "; -fx-text-fill: white; " +
-                       "-fx-padding: 2 8 2 8; -fx-background-radius: 10; -fx-font-size: 11px;");
+        badge.getStyleClass().add(styleClass);
         return badge;
     }
 
@@ -146,12 +99,12 @@ public class GitOperationsPanel {
                 : "O diretório existe mas não contém um repositório Git válido.";
         Label msg = new Label("Repositório indisponível neste PC\n\n" + reason);
         msg.setWrapText(true);
-        msg.setStyle("-fx-text-fill: #7f8c8d; -fx-font-size: 14px;");
+        msg.getStyleClass().add("gm-unavailable-msg");
         msg.setAlignment(Pos.CENTER);
         Button editBtn = new Button("Editar projeto");
         editBtn.setOnAction(e -> onEdit.accept(project));
         Button removeBtn = new Button("Remover da lista");
-        removeBtn.setStyle("-fx-background-color: #c0392b; -fx-text-fill: white;");
+        removeBtn.getStyleClass().add("gm-btn-danger");
         removeBtn.setOnAction(e -> {
             projectService.deleteProject(project.getPath());
             onRefresh.run();
@@ -165,89 +118,257 @@ public class GitOperationsPanel {
         return root;
     }
 
+    // ---------- Visão Geral ----------
+
+    private Node buildOverviewTab() {
+        // Branch selector
+        branchCombo = new ComboBox<>();
+        refreshBranches();
+        branchCombo.setPrefWidth(200);
+
+        Button checkoutBtn = new Button("Checkout");
+        checkoutBtn.getStyleClass().add("gm-btn-neutral");
+        checkoutBtn.setOnAction(e -> doCheckout());
+
+        Button newBranchBtn = new Button("Nova Branch");
+        newBranchBtn.setOnAction(e -> doNewBranch());
+
+        HBox branchRow = new HBox(8, new Label("Branch:"), branchCombo, checkoutBtn, newBranchBtn);
+        branchRow.setAlignment(Pos.CENTER_LEFT);
+
+        // Sync buttons
+        Button pushBtn = buildOpBtn("Push ↑", "gm-btn-primary", e -> doGitOp("push"));
+        Button pullBtn = buildOpBtn("Pull ↓", "gm-btn-success", e -> doGitOp("pull"));
+        Button fetchBtn = buildOpBtn("Fetch", "gm-btn-neutral", e -> doGitOp("fetch"));
+
+        HBox syncRow = new HBox(10, pushBtn, pullBtn, fetchBtn);
+        syncRow.setAlignment(Pos.CENTER_LEFT);
+
+        // Commit section
+        TitledPane commitPane = buildCommitPane();
+
+        // Output area
+        outputArea = new TextArea();
+        outputArea.setEditable(false);
+        outputArea.setPrefHeight(140);
+        outputArea.getStyleClass().add("gm-output");
+
+        Button clearBtn = new Button("Limpar saída");
+        clearBtn.setOnAction(e -> { if (outputArea != null) outputArea.clear(); });
+
+        HBox outputHeader = new HBox(10, new Label("Saída das operações:"), new Spacer(), clearBtn);
+        outputHeader.setAlignment(Pos.CENTER_LEFT);
+
+        VBox content = new VBox(12,
+                branchRow,
+                new Separator(),
+                syncRow,
+                new Separator(),
+                commitPane,
+                outputHeader,
+                outputArea);
+        content.setPadding(new Insets(14, 16, 16, 16));
+
+        ScrollPane scroll = new ScrollPane(content);
+        scroll.setFitToWidth(true);
+        scroll.setStyle("-fx-background-color: transparent;");
+        return scroll;
+    }
+
     private TitledPane buildCommitPane() {
-        CheckBox addAllCheck = new CheckBox("Adicionar todos os arquivos antes (git add -A)");
-        addAllCheck.setSelected(true);
+        stagingPanel = new StagingPanel(project.getPath(), gitService);
+        Node stagingNode = stagingPanel.build();
 
         TextArea commitMsg = new TextArea();
         commitMsg.setPromptText("Mensagem do commit...");
         commitMsg.setPrefRowCount(3);
 
-        TextField authorName = new TextField();
-        authorName.setPromptText("Nome do autor (opcional)");
-
-        TextField authorEmail = new TextField();
-        authorEmail.setPromptText("Email do autor (opcional)");
-
-        HBox authorRow = new HBox(8, authorName, authorEmail);
-        HBox.setHgrow(authorName, Priority.ALWAYS);
-        HBox.setHgrow(authorEmail, Priority.ALWAYS);
-
-        Button commitBtn = buildOpBtn("Fazer Commit", "#e67e22", e -> {
+        Button commitBtn = buildOpBtn("Fazer Commit", "gm-btn-warn", e -> {
             String msg = commitMsg.getText().trim();
             if (msg.isBlank()) {
                 showOutput("⚠ Mensagem do commit não pode ser vazia.");
                 return;
             }
-            runAsync(() -> gitService.commit(project.getPath(), msg, addAllCheck.isSelected(),
-                    authorName.getText().trim(), authorEmail.getText().trim()));
-            commitMsg.clear();
+            List<String> selected = stagingPanel.getSelectedPaths();
+            if (selected.isEmpty()) {
+                showOutput("⚠ Nenhum arquivo selecionado para commit.");
+                return;
+            }
+            runAsync(() -> {
+                String result = gitService.commitSelected(project.getPath(), msg, selected, null, null);
+                Platform.runLater(() -> {
+                    showOutput(result);
+                    commitMsg.clear();
+                    onRefresh.run();
+                });
+                return result;
+            });
         });
 
-        VBox box = new VBox(8, addAllCheck, commitMsg, authorRow, commitBtn);
+        VBox box = new VBox(8, stagingNode, commitMsg, commitBtn);
         box.setPadding(new Insets(8));
         TitledPane pane = new TitledPane("Commit", box);
-        pane.setExpanded(false);
+        pane.setExpanded(true);
         return pane;
     }
 
-    private TitledPane buildLogPane() {
+    // ---------- Histórico ----------
+
+    private Node buildHistoryTab() {
+        // Text list tab
         ListView<String> logList = new ListView<>();
-        logList.setPrefHeight(180);
+        logList.setPrefHeight(220);
+        logList.getStyleClass().add("gm-output");
         logList.setStyle("-fx-font-family: monospace; -fx-font-size: 11px;");
 
         Button refreshLog = new Button("Atualizar");
-        refreshLog.setStyle("-fx-cursor: hand;");
         refreshLog.setOnAction(e -> {
             List<String> commits = gitService.getRecentCommits(project.getPath(), 20);
             logList.getItems().setAll(commits);
         });
-        // Carrega automaticamente
-        new Thread(() -> {
-            List<String> commits = gitService.getRecentCommits(project.getPath(), 20);
-            Platform.runLater(() -> logList.getItems().setAll(commits));
-        }).start();
+        VBox listBox = new VBox(6, refreshLog, logList);
+        listBox.setPadding(new Insets(8));
+        Tab listTab = new Tab("Lista textual", listBox);
+        listTab.setClosable(false);
 
-        VBox box = new VBox(6, refreshLog, logList);
-        box.setPadding(new Insets(8));
-        TitledPane pane = new TitledPane("Histórico de commits (últimos 20)", box);
-        pane.setExpanded(false);
-        return pane;
+        // Graph timeline tab
+        GitTimelinePanel timeline = new GitTimelinePanel(project.getPath(), gitService);
+        Tab graphTab = new Tab("Gráfico (timeline)", timeline);
+        graphTab.setClosable(false);
+
+        TabPane historyTabs = new TabPane(listTab, graphTab);
+        return historyTabs;
     }
 
-    private TitledPane buildNotesPane() {
-        TextArea notesArea = new TextArea(project.getNotes() != null ? project.getNotes() : "");
-        notesArea.setPromptText("Escreva observações sobre este projeto...");
-        notesArea.setPrefRowCount(4);
+    // ---------- Tags ----------
 
-        Button saveNotes = new Button("Salvar notas");
-        saveNotes.setStyle("-fx-cursor: hand; -fx-background-color: #2980b9; -fx-text-fill: white;");
-        saveNotes.setOnAction(e -> {
-            project.setNotes(notesArea.getText());
-            try {
-                projectService.updateProject(project);
-                showOutput("✓ Notas salvas.");
-            } catch (Exception ex) {
-                showOutput("Erro ao salvar notas: " + ex.getMessage());
-            }
+    private Node buildTagsTab() {
+        ListView<String> tagList = new ListView<>();
+        tagList.setPrefHeight(260);
+
+        Button refreshBtn = new Button("↻ Atualizar");
+        refreshBtn.setOnAction(e -> loadTags(tagList));
+
+        Button createBtn = new Button("+ Nova Tag");
+        createBtn.getStyleClass().add("gm-btn-primary");
+        createBtn.setOnAction(e -> {
+            TextInputDialog nameDialog = new TextInputDialog();
+            ThemeManager.applyToDialog(nameDialog);
+            nameDialog.setTitle("Nova Tag");
+            nameDialog.setHeaderText("Criar nova tag");
+            nameDialog.setContentText("Nome da tag:");
+            nameDialog.showAndWait().ifPresent(name -> {
+                if (name.isBlank()) return;
+                TextInputDialog msgDialog = new TextInputDialog();
+                ThemeManager.applyToDialog(msgDialog);
+                msgDialog.setTitle("Mensagem da Tag");
+                msgDialog.setHeaderText("Mensagem (opcional)");
+                msgDialog.setContentText("Mensagem:");
+                msgDialog.showAndWait().ifPresent(msg -> {
+                    runAsync(() -> {
+                        String result = gitService.createTag(project.getPath(), name.trim(), msg.trim());
+                        Platform.runLater(() -> {
+                            showOutput(result);
+                            loadTags(tagList);
+                        });
+                        return result;
+                    });
+                });
+            });
         });
 
-        VBox box = new VBox(8, notesArea, saveNotes);
-        box.setPadding(new Insets(8));
-        TitledPane pane = new TitledPane("Observações / Notas", box);
-        pane.setExpanded(true);
-        return pane;
+        HBox topBar = new HBox(10, refreshBtn, createBtn);
+        topBar.setAlignment(Pos.CENTER_LEFT);
+        topBar.setPadding(new Insets(8, 0, 6, 0));
+
+        VBox box = new VBox(8, topBar, tagList);
+        box.setPadding(new Insets(14, 16, 16, 16));
+
+        loadTags(tagList);
+        return box;
     }
+
+    private void loadTags(ListView<String> list) {
+        new Thread(() -> {
+            List<String> tags = gitService.getTags(project.getPath());
+            Platform.runLater(() -> list.getItems().setAll(tags));
+        }).start();
+    }
+
+    // ---------- Stash ----------
+
+    private Node buildStashTab() {
+        ListView<String> stashList = new ListView<>();
+        stashList.setPrefHeight(220);
+
+        Button refreshBtn = new Button("↻ Atualizar");
+        refreshBtn.setOnAction(e -> loadStashes(stashList));
+
+        Button saveBtn = new Button("+ Salvar Stash");
+        saveBtn.getStyleClass().add("gm-btn-primary");
+        saveBtn.setOnAction(e -> {
+            TextInputDialog dialog = new TextInputDialog();
+            ThemeManager.applyToDialog(dialog);
+            dialog.setTitle("Salvar Stash");
+            dialog.setHeaderText("Salvar alterações atuais em stash");
+            dialog.setContentText("Mensagem (opcional):");
+            dialog.showAndWait().ifPresent(msg -> {
+                runAsync(() -> {
+                    String result = gitService.stashSave(project.getPath(), msg.trim());
+                    Platform.runLater(() -> {
+                        showOutput(result);
+                        loadStashes(stashList);
+                    });
+                    return result;
+                });
+            });
+        });
+
+        Button applyBtn = new Button("Aplicar selecionado");
+        applyBtn.setOnAction(e -> {
+            int idx = stashList.getSelectionModel().getSelectedIndex();
+            if (idx < 0) return;
+            runAsync(() -> {
+                String result = gitService.stashApply(project.getPath(), idx);
+                Platform.runLater(() -> showOutput(result));
+                return result;
+            });
+        });
+
+        Button popBtn = new Button("Pop selecionado");
+        popBtn.getStyleClass().add("gm-btn-success");
+        popBtn.setOnAction(e -> {
+            int idx = stashList.getSelectionModel().getSelectedIndex();
+            if (idx < 0) return;
+            runAsync(() -> {
+                String result = gitService.stashPop(project.getPath(), idx);
+                Platform.runLater(() -> {
+                    showOutput(result);
+                    loadStashes(stashList);
+                });
+                return result;
+            });
+        });
+
+        HBox topBar = new HBox(10, refreshBtn, saveBtn, new Spacer(), applyBtn, popBtn);
+        topBar.setAlignment(Pos.CENTER_LEFT);
+        topBar.setPadding(new Insets(8, 0, 6, 0));
+
+        VBox box = new VBox(8, topBar, stashList);
+        box.setPadding(new Insets(14, 16, 16, 16));
+
+        loadStashes(stashList);
+        return box;
+    }
+
+    private void loadStashes(ListView<String> list) {
+        new Thread(() -> {
+            List<String> stashes = gitService.getStashes(project.getPath());
+            Platform.runLater(() -> list.getItems().setAll(stashes));
+        }).start();
+    }
+
+    // ---------- Actions ----------
 
     private void refreshBranches() {
         new Thread(() -> {
@@ -273,6 +394,7 @@ public class GitOperationsPanel {
 
     private void doNewBranch() {
         TextInputDialog dialog = new TextInputDialog();
+        ThemeManager.applyToDialog(dialog);
         dialog.setTitle("Nova Branch");
         dialog.setHeaderText("Criar nova branch");
         dialog.setContentText("Nome da branch:");
@@ -290,6 +412,7 @@ public class GitOperationsPanel {
 
     private void doGitOp(String op) {
         Alert alert = new Alert(Alert.AlertType.CONFIRMATION);
+        ThemeManager.applyToDialog(alert);
         alert.setTitle("Credenciais (opcional)");
         alert.setHeaderText("Usar credenciais HTTP?");
         alert.setContentText("Deixe em branco para usar SSH ou o gerenciador de credenciais do sistema.");
@@ -321,6 +444,7 @@ public class GitOperationsPanel {
 
     private Dialog<String[]> buildCredentialDialog() {
         Dialog<String[]> dialog = new Dialog<>();
+        ThemeManager.applyToDialog(dialog);
         dialog.setTitle("Credenciais Git");
         dialog.setHeaderText("Informe suas credenciais (deixe vazio para usar SSH/token configurado)");
 
@@ -344,10 +468,10 @@ public class GitOperationsPanel {
         return dialog;
     }
 
-    private Button buildOpBtn(String text, String color, javafx.event.EventHandler<javafx.event.ActionEvent> handler) {
+    private Button buildOpBtn(String text, String styleClass, javafx.event.EventHandler<javafx.event.ActionEvent> handler) {
         Button btn = new Button(text);
-        btn.setStyle("-fx-background-color: " + color + "; -fx-text-fill: white; " +
-                     "-fx-font-size: 13px; -fx-cursor: hand; -fx-pref-width: 110;");
+        btn.getStyleClass().add(styleClass);
+        btn.setPrefWidth(110);
         btn.setOnAction(handler);
         return btn;
     }
