@@ -75,6 +75,10 @@
     -fx-background-color: derive(-gm-surface, 10%);
 }
 
+.list-cell:empty:hover {
+    -fx-background-color: transparent;
+}
+
 /* Titled pane */
 .titled-pane > .title {
     -fx-background-color: -gm-surface;
@@ -354,6 +358,39 @@
     -fx-background-color: -gm-surface-alt;
     -fx-text-fill: -gm-text-secondary;
     -fx-font-weight: bold;
+}
+
+/* Diff view list cells – ensure colors override selection/focus */
+.diff-view .list-cell.gm-diff-added,
+.diff-view .list-cell.gm-diff-added:selected,
+.diff-view .list-cell.gm-diff-added:focused {
+    -fx-background-color: -gm-added;
+    -fx-text-fill: -gm-added-text;
+}
+
+.diff-view .list-cell.gm-diff-removed,
+.diff-view .list-cell.gm-diff-removed:selected,
+.diff-view .list-cell.gm-diff-removed:focused {
+    -fx-background-color: -gm-removed;
+    -fx-text-fill: -gm-removed-text;
+}
+
+.diff-view .list-cell.gm-diff-header,
+.diff-view .list-cell.gm-diff-header:selected,
+.diff-view .list-cell.gm-diff-header:focused {
+    -fx-background-color: -gm-surface-alt;
+    -fx-text-fill: -gm-text-secondary;
+    -fx-font-weight: bold;
+}
+
+.diff-view .list-cell {
+    -fx-padding: 1 6 1 6;
+    -fx-font-family: monospace;
+    -fx-font-size: 12px;
+}
+
+.diff-view .list-cell:empty:hover {
+    -fx-background-color: transparent;
 }
 
 .gm-surface-header {

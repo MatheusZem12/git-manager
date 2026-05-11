@@ -2,11 +2,14 @@ package com.gitmanager.ui.dialog;
 
 import com.gitmanager.model.GitFileChange;
 import com.gitmanager.service.GitService;
+import com.gitmanager.ui.components.DiffView;
 import com.gitmanager.ui.theme.ThemeManager;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.collections.transformation.FilteredList;
+import javafx.collections.transformation.SortedList;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
@@ -29,7 +32,7 @@ public class StagingPanel {
 
     private ListView<GitFileChange> listView;
     private TextArea currentView;
-    private TextArea diffView;
+    private DiffView diffView;
     private Label emptyLabel;
     private Label fileInfoLabel;
     private TabPane tabPane;
@@ -43,20 +46,35 @@ public class StagingPanel {
         Label title = new Label("Arquivos alterados");
         title.setFont(Font.font("System", FontWeight.BOLD, 13));
 
-        Button refreshBtn = new Button("↻ Atualizar");
-        refreshBtn.setOnAction(e -> loadChanges());
-
         Button selectAllBtn = new Button("Selecionar todos");
         selectAllBtn.setOnAction(e -> setAllSelected(true));
 
         Button selectNoneBtn = new Button("Limpar seleção");
         selectNoneBtn.setOnAction(e -> setAllSelected(false));
 
-        HBox topBar = new HBox(8, title, new Spacer(), selectAllBtn, selectNoneBtn, refreshBtn);
+        TextField filterField = new TextField();
+        filterField.setPromptText("Filtrar por path...");
+        filterField.setPrefWidth(220);
+        filterField.getStyleClass().add("text-field");
+
+        HBox topBar = new HBox(8, title, new Spacer(), filterField, selectAllBtn, selectNoneBtn);
         topBar.setAlignment(Pos.CENTER_LEFT);
         topBar.setPadding(new Insets(0, 0, 6, 0));
 
-        listView = new ListView<>(allChanges);
+        // Ordenar por path e permitir filtro
+        SortedList<GitFileChange> sortedChanges = new SortedList<>(allChanges, java.util.Comparator.comparing(GitFileChange::getPath));
+        FilteredList<GitFileChange> filteredChanges = new FilteredList<>(sortedChanges, p -> true);
+
+        filterField.textProperty().addListener((obs, oldVal, newVal) -> {
+            if (newVal == null || newVal.isEmpty()) {
+                filteredChanges.setPredicate(p -> true);
+            } else {
+                String lower = newVal.toLowerCase();
+                filteredChanges.setPredicate(p -> p.getPath().toLowerCase().contains(lower));
+            }
+        });
+
+        listView = new ListView<>(filteredChanges);
         listView.setCellFactory(lv -> new ChangeCell());
         listView.setPrefHeight(220);
         listView.getSelectionModel().selectedItemProperty().addListener((obs, old, selected) -> {
@@ -76,10 +94,7 @@ public class StagingPanel {
         currentView.setWrapText(true);
         currentView.getStyleClass().add("gm-output");
 
-        diffView = new TextArea();
-        diffView.setEditable(false);
-        diffView.setWrapText(false);
-        diffView.getStyleClass().add("gm-output");
+        diffView = new DiffView();
 
         Tab currentTab = new Tab("Arquivo atual", currentView);
         currentTab.setClosable(false);
@@ -146,14 +161,14 @@ public class StagingPanel {
         currentView.setText(content);
 
         if (change.getType() == GitFileChange.Type.ADDED) {
-            diffView.setText("(arquivo novo – diff mostrará o conteúdo completo como adição)\n\n" + content);
+            diffView.setDiffText("(arquivo novo – diff mostrará o conteúdo completo como adição)\n\n" + content);
         } else if (change.getType() == GitFileChange.Type.DELETED) {
-            diffView.setText("(arquivo removido – não há conteúdo atual no disco)");
+            diffView.setDiffText("(arquivo removido – não há conteúdo atual no disco)");
         } else if (change.getType() == GitFileChange.Type.UNTRACKED) {
-            diffView.setText("(arquivo não rastreado – ainda não está no index)\n\n" + content);
+            diffView.setDiffText("(arquivo não rastreado – ainda não está no index)\n\n" + content);
         } else {
             String diff = gitService.getFileDiff(repoPath, change.getPath(), change.isStaged());
-            diffView.setText(diff);
+            diffView.setDiffText(diff);
         }
     }
 

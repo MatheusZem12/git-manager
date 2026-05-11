@@ -2,6 +2,7 @@ package com.gitmanager.ui.dashboard;
 
 import com.gitmanager.model.GitProject;
 import com.gitmanager.service.ProjectService;
+import com.gitmanager.ui.components.UiComponents;
 import com.gitmanager.ui.dialog.AddEditProjectDialog;
 import com.gitmanager.ui.dialog.GitOperationsPanel;
 import com.gitmanager.ui.theme.ThemeManager;
@@ -52,21 +53,21 @@ public class DashboardScreen {
         appTitle.setFont(Font.font("System", FontWeight.BOLD, 18));
         appTitle.getStyleClass().add("gm-header-label");
 
-        Button themeBtn = new Button(ThemeManager.isDark() ? "☀ Claro" : "☾ Escuro");
+        Button themeBtn = new Button(ThemeManager.isDark() ? "☀ Claro" : "🌙 Escuro");
+        themeBtn.getStyleClass().add("gm-btn-neutral");
         themeBtn.setOnAction(e -> {
             ThemeManager.toggle();
-            themeBtn.setText(ThemeManager.isDark() ? "☀ Claro" : "☾ Escuro");
+            themeBtn.setText(ThemeManager.isDark() ? "☀ Claro" : "🌙 Escuro");
             GitProject selected = listView.getSelectionModel().getSelectedItem();
             if (selected != null) {
                 onProjectSelected(selected);
             }
         });
 
-        Button addBtn = new Button("+ Adicionar");
-        addBtn.getStyleClass().add("gm-btn-success");
-        addBtn.setOnAction(e -> openAddDialog());
+        Button addBtn = UiComponents.successButton("+ Adicionar", this::openAddDialog);
 
         Button refreshBtn = new Button("↻ Atualizar");
+        refreshBtn.getStyleClass().add("gm-btn-primary");
         refreshBtn.setOnAction(e -> loadProjects());
 
         HBox header = new HBox(10, appTitle, new Spacer(), themeBtn, refreshBtn, addBtn);
@@ -179,7 +180,9 @@ public class DashboardScreen {
     private void onProjectSelected(GitProject project) {
         if (project == null) return;
         GitOperationsPanel panel = new GitOperationsPanel(
-                project, projectService, this::loadProjects, this::openEditDialog);
+                project, projectService, this::loadProjects,
+                () -> Platform.runLater(() -> onProjectSelected(project)),
+                this::openEditDialog);
         detailArea.setCenter(panel.build());
     }
 

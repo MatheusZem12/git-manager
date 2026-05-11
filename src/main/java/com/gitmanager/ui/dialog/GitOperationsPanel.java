@@ -23,6 +23,7 @@ public class GitOperationsPanel {
     private final ProjectService projectService;
     private final GitService gitService;
     private final Runnable onRefresh;
+    private final Runnable onProjectRefresh;
     private final Consumer<GitProject> onEdit;
 
     private TextArea outputArea;
@@ -30,11 +31,13 @@ public class GitOperationsPanel {
     private StagingPanel stagingPanel;
 
     public GitOperationsPanel(GitProject project, ProjectService projectService,
-                              Runnable onRefresh, Consumer<GitProject> onEdit) {
+                              Runnable onRefresh, Runnable onProjectRefresh,
+                              Consumer<GitProject> onEdit) {
         this.project = project;
         this.projectService = projectService;
         this.gitService = projectService.getGitService();
         this.onRefresh = onRefresh;
+        this.onProjectRefresh = onProjectRefresh;
         this.onEdit = onEdit;
     }
 
@@ -221,12 +224,11 @@ public class GitOperationsPanel {
         logList.getStyleClass().add("gm-output");
         logList.setStyle("-fx-font-family: monospace; -fx-font-size: 11px;");
 
-        Button refreshLog = new Button("Atualizar");
-        refreshLog.setOnAction(e -> {
-            List<String> commits = gitService.getRecentCommits(project.getPath(), 20);
-            logList.getItems().setAll(commits);
-        });
-        VBox listBox = new VBox(6, refreshLog, logList);
+        // Load commits immediately
+        List<String> recentCommits = gitService.getRecentCommits(project.getPath(), 20);
+        logList.getItems().setAll(recentCommits);
+
+        VBox listBox = new VBox(6, logList);
         listBox.setPadding(new Insets(8));
         Tab listTab = new Tab("Lista textual", listBox);
         listTab.setClosable(false);
@@ -237,7 +239,11 @@ public class GitOperationsPanel {
         graphTab.setClosable(false);
 
         TabPane historyTabs = new TabPane(listTab, graphTab);
-        return historyTabs;
+        historyTabs.setPrefHeight(520);
+        VBox wrapper = new VBox(historyTabs);
+        VBox.setVgrow(historyTabs, Priority.ALWAYS);
+        wrapper.setAlignment(Pos.CENTER);
+        return wrapper;
     }
 
     // ---------- Tags ----------
