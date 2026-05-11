@@ -252,9 +252,6 @@ public class GitOperationsPanel {
         ListView<String> tagList = new ListView<>();
         tagList.setPrefHeight(260);
 
-        Button refreshBtn = new Button("↻ Atualizar");
-        refreshBtn.setOnAction(e -> loadTags(tagList));
-
         Button createBtn = new Button("+ Nova Tag");
         createBtn.getStyleClass().add("gm-btn-primary");
         createBtn.setOnAction(e -> {
@@ -283,7 +280,7 @@ public class GitOperationsPanel {
             });
         });
 
-        HBox topBar = new HBox(10, refreshBtn, createBtn);
+        HBox topBar = new HBox(10, createBtn);
         topBar.setAlignment(Pos.CENTER_LEFT);
         topBar.setPadding(new Insets(8, 0, 6, 0));
 
@@ -306,9 +303,6 @@ public class GitOperationsPanel {
     private Node buildStashTab() {
         ListView<String> stashList = new ListView<>();
         stashList.setPrefHeight(220);
-
-        Button refreshBtn = new Button("↻ Atualizar");
-        refreshBtn.setOnAction(e -> loadStashes(stashList));
 
         Button saveBtn = new Button("+ Salvar Stash");
         saveBtn.getStyleClass().add("gm-btn-primary");
@@ -356,7 +350,7 @@ public class GitOperationsPanel {
             });
         });
 
-        HBox topBar = new HBox(10, refreshBtn, saveBtn, new Spacer(), applyBtn, popBtn);
+        HBox topBar = new HBox(10, saveBtn, new Spacer(), applyBtn, popBtn);
         topBar.setAlignment(Pos.CENTER_LEFT);
         topBar.setPadding(new Insets(8, 0, 6, 0));
 
