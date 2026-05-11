@@ -66,7 +66,7 @@ public class DashboardScreen {
 
         Button addBtn = UiComponents.successButton("+ Adicionar", this::openAddDialog);
 
-        Button refreshBtn = new Button("↻ Atualizar");
+        Button refreshBtn = new Button("⟳ Atualizar");
         refreshBtn.getStyleClass().add("gm-btn-primary");
         refreshBtn.setOnAction(e -> loadProjects());
 
