@@ -3,7 +3,7 @@ package com.gitmanager.ui.dialog;
 import com.gitmanager.model.GitFileChange;
 import com.gitmanager.service.GitService;
 import com.gitmanager.ui.components.DiffView;
-import com.gitmanager.ui.theme.ThemeManager;
+import com.gitmanager.ui.components.UiComponents;
 import javafx.application.Platform;
 import javafx.beans.property.SimpleBooleanProperty;
 import javafx.collections.FXCollections;
@@ -16,13 +16,15 @@ import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
 import javafx.scene.paint.Color;
-import javafx.scene.text.Font;
-import javafx.scene.text.FontWeight;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
+/**
+ * Painel de staging com lista de arquivos alterados e preview de diff.
+ * Layout premium com cards, filtros e syntax highlighting refinado.
+ */
 public class StagingPanel {
 
     private final String repoPath;
@@ -33,7 +35,6 @@ public class StagingPanel {
     private ListView<GitFileChange> listView;
     private TextArea currentView;
     private DiffView diffView;
-    private Label emptyLabel;
     private Label fileInfoLabel;
     private TabPane tabPane;
 
@@ -43,26 +44,25 @@ public class StagingPanel {
     }
 
     public Node build() {
-        Label title = new Label("Arquivos alterados");
-        title.setFont(Font.font("System", FontWeight.BOLD, 13));
-
-        Button selectAllBtn = new Button("Selecionar todos");
-        selectAllBtn.setOnAction(e -> setAllSelected(true));
-
-        Button selectNoneBtn = new Button("Limpar seleção");
-        selectNoneBtn.setOnAction(e -> setAllSelected(false));
-
-        TextField filterField = new TextField();
-        filterField.setPromptText("Filtrar por path...");
-        filterField.setPrefWidth(220);
-        filterField.getStyleClass().add("text-field");
-
-        HBox topBar = new HBox(8, title, new Spacer(), filterField, selectAllBtn, selectNoneBtn);
+        // Header
+        HBox topBar = new HBox(12);
         topBar.setAlignment(Pos.CENTER_LEFT);
-        topBar.setPadding(new Insets(0, 0, 6, 0));
+        topBar.setPadding(new Insets(0, 0, 12, 0));
 
-        // Ordenar por path e permitir filtro
-        SortedList<GitFileChange> sortedChanges = new SortedList<>(allChanges, java.util.Comparator.comparing(GitFileChange::getPath));
+        Label title = new Label(UiComponents.ICON_CHANGES + "  Arquivos Alterados");
+        title.getStyleClass().add("gm-section-header");
+
+        TextField filterField = UiComponents.searchField("Filtrar por nome...");
+        filterField.setPrefWidth(200);
+
+        Button selectAllBtn = UiComponents.ghostButton("Todos", () -> setAllSelected(true));
+        Button selectNoneBtn = UiComponents.ghostButton("Nenhum", () -> setAllSelected(false));
+
+        topBar.getChildren().addAll(title, UiComponents.spacer(), filterField, selectAllBtn, selectNoneBtn);
+
+        // Lista filtrada e ordenada
+        SortedList<GitFileChange> sortedChanges = new SortedList<>(allChanges,
+                java.util.Comparator.comparing(GitFileChange::getPath));
         FilteredList<GitFileChange> filteredChanges = new FilteredList<>(sortedChanges, p -> true);
 
         filterField.textProperty().addListener((obs, oldVal, newVal) -> {
@@ -74,9 +74,11 @@ public class StagingPanel {
             }
         });
 
+        // ListView
         listView = new ListView<>(filteredChanges);
         listView.setCellFactory(lv -> new ChangeCell());
-        listView.setPrefHeight(220);
+        listView.setPrefHeight(240);
+        listView.setStyle("-fx-background-color: transparent;");
         listView.getSelectionModel().selectedItemProperty().addListener((obs, old, selected) -> {
             if (selected != null) {
                 showFile(selected);
@@ -85,35 +87,42 @@ public class StagingPanel {
             }
         });
 
+        // Preview
         fileInfoLabel = new Label("Selecione um arquivo para visualizar");
-        fileInfoLabel.setFont(Font.font("System", FontWeight.BOLD, 12));
-        fileInfoLabel.setPadding(new Insets(8, 0, 4, 0));
+        fileInfoLabel.getStyleClass().add("gm-file-info");
 
         currentView = new TextArea();
         currentView.setEditable(false);
         currentView.setWrapText(true);
         currentView.getStyleClass().add("gm-output");
+        currentView.setPrefHeight(220);
 
         diffView = new DiffView();
+        diffView.setPrefHeight(220);
 
-        Tab currentTab = new Tab("Arquivo atual", currentView);
+        Tab currentTab = new Tab(UiComponents.ICON_FILE + "  Atual", currentView);
         currentTab.setClosable(false);
-        Tab diffTab = new Tab("Diff (antes/depois)", diffView);
+        Tab diffTab = new Tab("Diff", diffView);
         diffTab.setClosable(false);
 
         tabPane = new TabPane(currentTab, diffTab);
         tabPane.setPrefHeight(280);
+        tabPane.setStyle("-fx-background-color: transparent;");
 
         VBox previewBox = new VBox(fileInfoLabel, tabPane);
+        previewBox.getStyleClass().add("gm-card");
+        previewBox.setPadding(new Insets(14));
         VBox.setVgrow(tabPane, Priority.ALWAYS);
 
+        // Split
         SplitPane split = new SplitPane(listView, previewBox);
-        split.setDividerPositions(0.40);
+        split.setDividerPositions(0.42);
         split.setOrientation(javafx.geometry.Orientation.VERTICAL);
+        split.setStyle("-fx-background-color: transparent;");
 
-        VBox root = new VBox(6, topBar, split);
+        VBox root = new VBox(10, topBar, split);
         VBox.setVgrow(split, Priority.ALWAYS);
-        root.setPadding(new Insets(8));
+        root.setPadding(new Insets(6));
 
         Platform.runLater(this::loadChanges);
         return root;
@@ -140,6 +149,7 @@ public class StagingPanel {
                 if (changes.isEmpty()) {
                     clearViews();
                     fileInfoLabel.setText("Nenhuma alteração pendente");
+                    fileInfoLabel.setTextFill(Color.web("#5e6a7a"));
                 }
             });
         }).start();
@@ -153,19 +163,20 @@ public class StagingPanel {
     }
 
     private void showFile(GitFileChange change) {
-        fileInfoLabel.setText(change.getPath() + "  —  " + change.getType().getLabel());
-        boolean dark = ThemeManager.isDark();
-        fileInfoLabel.setTextFill(Color.web(change.getType().getColor(dark)));
+        String icon = getTypeIcon(change.getType());
+        fileInfoLabel.setText(icon + "  " + change.getPath() + "  —  " + change.getType().getLabel());
+        String color = change.getType().getColor();
+        fileInfoLabel.setTextFill(Color.web(color));
 
         String content = gitService.getFileContent(repoPath, change.getPath());
         currentView.setText(content);
 
         if (change.getType() == GitFileChange.Type.ADDED) {
-            diffView.setDiffText("(arquivo novo – diff mostrará o conteúdo completo como adição)\n\n" + content);
+            diffView.setDiffText("(arquivo novo)\n\n" + content);
         } else if (change.getType() == GitFileChange.Type.DELETED) {
-            diffView.setDiffText("(arquivo removido – não há conteúdo atual no disco)");
+            diffView.setDiffText("(arquivo removido)");
         } else if (change.getType() == GitFileChange.Type.UNTRACKED) {
-            diffView.setDiffText("(arquivo não rastreado – ainda não está no index)\n\n" + content);
+            diffView.setDiffText("(não rastreado)\n\n" + content);
         } else {
             String diff = gitService.getFileDiff(repoPath, change.getPath(), change.isStaged());
             diffView.setDiffText(diff);
@@ -176,27 +187,35 @@ public class StagingPanel {
         currentView.clear();
         diffView.clear();
         fileInfoLabel.setText("Selecione um arquivo para visualizar");
-        fileInfoLabel.setTextFill(Color.web(ThemeManager.isDark() ? "#a0a0a0" : "#6c757d"));
+        fileInfoLabel.setTextFill(Color.web("#5e6a7a"));
     }
 
-    private static class Spacer extends Region {
-        Spacer() { HBox.setHgrow(this, Priority.ALWAYS); }
+    private String getTypeIcon(GitFileChange.Type type) {
+        return switch (type) {
+            case ADDED -> "+";
+            case MODIFIED -> "~";
+            case DELETED -> "-";
+            case RENAMED -> "→";
+            case CONFLICTING -> "!";
+            case UNTRACKED -> "?";
+        };
     }
 
-    private class ChangeCell extends ListCell<GitFileChange> {
+    private static class ChangeCell extends ListCell<GitFileChange> {
         private final CheckBox checkBox = new CheckBox();
         private final Label nameLabel = new Label();
         private final Label badge = new Label();
         private final HBox graphic;
 
         ChangeCell() {
-            nameLabel.setStyle("-fx-font-family: monospace; -fx-font-size: 12px;");
-            badge.setStyle("-fx-padding: 1 6 1 6; -fx-background-radius: 8; -fx-font-size: 10px;");
-            HBox right = new HBox(6, badge, checkBox);
+            nameLabel.setStyle("-fx-font-family: 'JetBrains Mono', monospace; -fx-font-size: 12.5px;");
+            badge.setStyle("-fx-padding: 3 10; -fx-background-radius: 10; -fx-font-size: 10.5px; -fx-font-weight: bold;");
+            HBox right = new HBox(10, badge, checkBox);
             right.setAlignment(Pos.CENTER_RIGHT);
-            graphic = new HBox(8, nameLabel, new Spacer(), right);
+            graphic = new HBox(12, nameLabel, UiComponents.spacer(), right);
             graphic.setAlignment(Pos.CENTER_LEFT);
-            graphic.setPadding(new Insets(4, 6, 4, 6));
+            graphic.setPadding(new Insets(8, 12, 8, 12));
+            graphic.getStyleClass().add("gm-project-card");
 
             checkBox.setOnAction(e -> {
                 GitFileChange item = getItem();
@@ -216,16 +235,24 @@ public class StagingPanel {
             nameLabel.setText(item.getPath());
             checkBox.setSelected(item.isStaged());
 
-            boolean dark = ThemeManager.isDark();
-            String color = item.getType().getColor(dark);
+            String color = item.getType().getColor();
             badge.setText(item.getType().getLabel());
-            badge.setStyle("-fx-background-color: " + color + "30; -fx-text-fill: " + color + "; " +
-                           "-fx-padding: 1 6 1 6; -fx-background-radius: 8; -fx-font-size: 10px;");
+            badge.setStyle("-fx-background-color: " + color + "20; -fx-text-fill: " + color + "; " +
+                           "-fx-padding: 3 10; -fx-background-radius: 10; -fx-font-size: 10.5px; -fx-font-weight: bold;");
 
             if (item.getType() == GitFileChange.Type.DELETED || item.getType() == GitFileChange.Type.CONFLICTING) {
-                nameLabel.setStyle("-fx-font-family: monospace; -fx-font-size: 12px; -fx-text-fill: " + color + ";");
+                nameLabel.setStyle("-fx-font-family: 'JetBrains Mono', monospace; -fx-font-size: 12.5px; -fx-text-fill: " + color + ";");
             } else {
-                nameLabel.setStyle("-fx-font-family: monospace; -fx-font-size: 12px;");
+                nameLabel.setStyle("-fx-font-family: 'JetBrains Mono', monospace; -fx-font-size: 12.5px;");
+            }
+
+            // Selected state
+            if (isSelected()) {
+                graphic.getStyleClass().remove("gm-project-card");
+                graphic.getStyleClass().add("gm-project-card-selected");
+            } else {
+                graphic.getStyleClass().remove("gm-project-card-selected");
+                graphic.getStyleClass().add("gm-project-card");
             }
 
             setGraphic(graphic);

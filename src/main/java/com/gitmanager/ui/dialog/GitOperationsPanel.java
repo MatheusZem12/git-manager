@@ -3,20 +3,28 @@ package com.gitmanager.ui.dialog;
 import com.gitmanager.model.GitProject;
 import com.gitmanager.service.GitService;
 import com.gitmanager.service.ProjectService;
+import com.gitmanager.ui.components.UiComponents;
 import com.gitmanager.ui.theme.ThemeManager;
 import com.gitmanager.ui.timeline.GitTimelinePanel;
+import javafx.animation.FadeTransition;
 import javafx.application.Platform;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Node;
 import javafx.scene.control.*;
 import javafx.scene.layout.*;
+import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
+import javafx.util.Duration;
 
 import java.util.List;
 import java.util.function.Consumer;
 
+/**
+ * Painel de operações Git para um projeto selecionado.
+ * Layout premium com cards, tabs modernas e botões refinados.
+ */
 public class GitOperationsPanel {
 
     private final GitProject project;
@@ -42,24 +50,7 @@ public class GitOperationsPanel {
     }
 
     public Node build() {
-        Label nameLabel = new Label(project.getName());
-        nameLabel.setFont(Font.font("System", FontWeight.BOLD, 20));
-
-        Label pathLabel = new Label(project.getPath());
-        pathLabel.getStyleClass().add("gm-path-label");
-        pathLabel.setWrapText(true);
-
-        Label statusBadge = buildStatusBadge();
-
-        Button editBtn = new Button("Editar");
-        editBtn.setOnAction(e -> onEdit.accept(project));
-
-        HBox titleRow = new HBox(10, nameLabel, statusBadge, new Spacer(), editBtn);
-        titleRow.setAlignment(Pos.CENTER_LEFT);
-
-        VBox header = new VBox(4, titleRow, pathLabel);
-        header.setPadding(new Insets(14, 16, 10, 16));
-        header.getStyleClass().add("gm-surface-header");
+        VBox header = buildHeader();
 
         if (!project.isAvailable()) {
             return buildUnavailableView(header);
@@ -67,126 +58,174 @@ public class GitOperationsPanel {
 
         TabPane mainTabs = new TabPane();
         mainTabs.setTabClosingPolicy(TabPane.TabClosingPolicy.UNAVAILABLE);
+        mainTabs.getStyleClass().add("gm-tab-modern");
+        mainTabs.setStyle("-fx-background-color: transparent;");
 
-        Tab overviewTab = new Tab("Visão Geral", buildOverviewTab());
-        Tab historyTab = new Tab("Histórico", buildHistoryTab());
-        Tab tagsTab = new Tab("Tags", buildTagsTab());
-        Tab stashTab = new Tab("Stash", buildStashTab());
+        Tab overviewTab = new Tab(UiComponents.ICON_GIT + "  Visão Geral", buildOverviewTab());
+        Tab historyTab = new Tab(UiComponents.ICON_COMMIT + "  Histórico", buildHistoryTab());
+        Tab tagsTab = new Tab(UiComponents.ICON_TAG + "  Tags", buildTagsTab());
+        Tab stashTab = new Tab(UiComponents.ICON_STASH + "  Stash", buildStashTab());
 
         mainTabs.getTabs().addAll(overviewTab, historyTab, tagsTab, stashTab);
 
         BorderPane root = new BorderPane();
         root.setTop(header);
         root.setCenter(mainTabs);
+        root.setPadding(new Insets(0));
+        root.setMinWidth(500);
+        root.setMinHeight(400);
         return root;
+    }
+
+    private VBox buildHeader() {
+        Label nameLabel = new Label(project.getName());
+        nameLabel.setFont(Font.font("Inter", FontWeight.BOLD, 24));
+        nameLabel.getStyleClass().add("gm-project-title");
+
+        Label pathLabel = new Label(project.getPath());
+        pathLabel.getStyleClass().add("gm-path-label");
+        pathLabel.setWrapText(true);
+
+        Label statusBadge = buildStatusBadge();
+
+        Button editBtn = UiComponents.iconButton(
+                UiComponents.ICON_EDIT, "Editar projeto", "gm-btn-icon",
+                () -> onEdit.accept(project));
+
+        HBox titleRow = new HBox(14, nameLabel, statusBadge, UiComponents.spacer(), editBtn);
+        titleRow.setAlignment(Pos.CENTER_LEFT);
+
+        VBox header = new VBox(6, titleRow, pathLabel);
+        header.setPadding(new Insets(22, 28, 18, 28));
+        header.getStyleClass().add("gm-surface-header");
+        return header;
     }
 
     private Label buildStatusBadge() {
         String text;
         String styleClass;
         if (!project.isExistsOnDisk()) {
-            text = "Não encontrado"; styleClass = "gm-badge-error";
+            text = "Não encontrado";
+            styleClass = "gm-badge-error";
         } else if (!project.isHasGit()) {
-            text = "Sem git"; styleClass = "gm-badge-warn";
+            text = "Sem git";
+            styleClass = "gm-badge-warn";
         } else {
-            text = "OK"; styleClass = "gm-badge-ok";
+            text = "OK";
+            styleClass = "gm-badge-ok";
         }
-        Label badge = new Label(text);
-        badge.getStyleClass().add(styleClass);
-        return badge;
+        return UiComponents.badge(text, styleClass);
     }
 
     private Node buildUnavailableView(VBox header) {
         String reason = !project.isExistsOnDisk()
-                ? "O diretório '" + project.getPath() + "' não existe neste computador."
+                ? "O diretório não existe neste computador."
                 : "O diretório existe mas não contém um repositório Git válido.";
-        Label msg = new Label("Repositório indisponível neste PC\n\n" + reason);
-        msg.setWrapText(true);
-        msg.getStyleClass().add("gm-unavailable-msg");
-        msg.setAlignment(Pos.CENTER);
-        Button editBtn = new Button("Editar projeto");
-        editBtn.setOnAction(e -> onEdit.accept(project));
-        Button removeBtn = new Button("Remover da lista");
-        removeBtn.getStyleClass().add("gm-btn-danger");
-        removeBtn.setOnAction(e -> {
+
+        VBox center = UiComponents.emptyState(
+                UiComponents.ICON_WARN,
+                "Repositório indisponível",
+                reason + "\n\nVocê pode editar o caminho ou remover da lista."
+        );
+
+        Button editBtn = UiComponents.neutralButton("Editar projeto", () -> onEdit.accept(project));
+        Button removeBtn = UiComponents.dangerButton("Remover da lista", () -> {
             projectService.deleteProject(project.getPath());
             onRefresh.run();
         });
-        VBox center = new VBox(16, msg, editBtn, removeBtn);
-        center.setAlignment(Pos.CENTER);
-        center.setPadding(new Insets(40));
+
+        HBox actions = new HBox(12, editBtn, removeBtn);
+        actions.setAlignment(Pos.CENTER);
+
+        VBox wrapper = new VBox(24, center, actions);
+        wrapper.setAlignment(Pos.CENTER);
+        wrapper.setPadding(new Insets(48));
+
         BorderPane root = new BorderPane();
         root.setTop(header);
-        root.setCenter(center);
+        root.setCenter(wrapper);
         return root;
     }
 
-    // ---------- Visão Geral ----------
+    // ========== Visão Geral ==========
 
     private Node buildOverviewTab() {
-        // Branch selector
+        // Branch section
+        VBox branchCard = UiComponents.card();
+        branchCard.getChildren().add(UiComponents.sectionHeader(UiComponents.ICON_BRANCH, "Branch"));
+
         branchCombo = new ComboBox<>();
+        branchCombo.setPrefWidth(240);
+        branchCombo.getStyleClass().add("combo-box");
         refreshBranches();
-        branchCombo.setPrefWidth(200);
 
-        Button checkoutBtn = new Button("Checkout");
-        checkoutBtn.getStyleClass().add("gm-btn-neutral");
-        checkoutBtn.setOnAction(e -> doCheckout());
+        Button checkoutBtn = UiComponents.neutralButton("Checkout", this::doCheckout);
+        Button newBranchBtn = UiComponents.primaryButton("+ Nova", this::doNewBranch);
 
-        Button newBranchBtn = new Button("Nova Branch");
-        newBranchBtn.setOnAction(e -> doNewBranch());
-
-        HBox branchRow = new HBox(8, new Label("Branch:"), branchCombo, checkoutBtn, newBranchBtn);
+        HBox branchRow = new HBox(12, new Label("Branch atual:"), branchCombo, checkoutBtn, newBranchBtn);
         branchRow.setAlignment(Pos.CENTER_LEFT);
+        branchCard.getChildren().add(branchRow);
 
-        // Sync buttons
-        Button pushBtn = buildOpBtn("Push ↑", "gm-btn-primary", e -> doGitOp("push"));
-        Button pullBtn = buildOpBtn("Pull ↓", "gm-btn-success", e -> doGitOp("pull"));
-        Button fetchBtn = buildOpBtn("Fetch", "gm-btn-neutral", e -> doGitOp("fetch"));
+        // Sync section
+        VBox syncCard = UiComponents.card();
+        syncCard.getChildren().add(UiComponents.sectionHeader(UiComponents.ICON_FETCH, "Sincronização"));
 
-        HBox syncRow = new HBox(10, pushBtn, pullBtn, fetchBtn);
+        Button pushBtn = buildOpBtn(UiComponents.ICON_PUSH + "  Push", "gm-btn-primary", e -> doGitOp("push"));
+        Button pullBtn = buildOpBtn(UiComponents.ICON_PULL + "  Pull", "gm-btn-success", e -> doGitOp("pull"));
+        Button fetchBtn = buildOpBtn(UiComponents.ICON_REFRESH + "  Fetch", "gm-btn-neutral", e -> doGitOp("fetch"));
+
+        HBox syncRow = new HBox(14, pushBtn, pullBtn, fetchBtn);
         syncRow.setAlignment(Pos.CENTER_LEFT);
+        syncCard.getChildren().add(syncRow);
 
         // Commit section
-        TitledPane commitPane = buildCommitPane();
+        VBox commitCard = buildCommitCard();
 
-        // Output area
+        // Output section
+        VBox outputCard = UiComponents.card();
+        outputCard.getChildren().add(UiComponents.sectionHeader(UiComponents.ICON_INFO, "Saída"));
+
         outputArea = new TextArea();
         outputArea.setEditable(false);
-        outputArea.setPrefHeight(140);
+        outputArea.setPrefHeight(180);
         outputArea.getStyleClass().add("gm-output");
+        outputArea.setWrapText(true);
 
-        Button clearBtn = new Button("Limpar saída");
-        clearBtn.setOnAction(e -> { if (outputArea != null) outputArea.clear(); });
+        Button clearBtn = UiComponents.ghostButton("Limpar", () -> outputArea.clear());
+        HBox outputHeader = new HBox(UiComponents.spacer(), clearBtn);
+        outputHeader.setAlignment(Pos.CENTER_RIGHT);
 
-        HBox outputHeader = new HBox(10, new Label("Saída das operações:"), new Spacer(), clearBtn);
-        outputHeader.setAlignment(Pos.CENTER_LEFT);
+        outputCard.getChildren().addAll(outputHeader, outputArea);
+        VBox.setVgrow(outputArea, Priority.ALWAYS);
 
-        VBox content = new VBox(12,
-                branchRow,
-                new Separator(),
-                syncRow,
-                new Separator(),
-                commitPane,
-                outputHeader,
-                outputArea);
-        content.setPadding(new Insets(14, 16, 16, 16));
+        VBox content = new VBox(18,
+                branchCard,
+                syncCard,
+                commitCard,
+                outputCard);
+        content.setPadding(new Insets(18, 24, 24, 24));
+        content.setSpacing(18);
 
         ScrollPane scroll = new ScrollPane(content);
         scroll.setFitToWidth(true);
         scroll.setStyle("-fx-background-color: transparent;");
+        scroll.setMinHeight(300);
         return scroll;
     }
 
-    private TitledPane buildCommitPane() {
+    private VBox buildCommitCard() {
+        VBox card = UiComponents.card();
+        card.getChildren().add(UiComponents.sectionHeader(UiComponents.ICON_CHANGES, "Commit"));
+
         stagingPanel = new StagingPanel(project.getPath(), gitService);
         Node stagingNode = stagingPanel.build();
 
         TextArea commitMsg = new TextArea();
         commitMsg.setPromptText("Mensagem do commit...");
         commitMsg.setPrefRowCount(3);
+        commitMsg.setStyle("-fx-font-size: 13.5px;");
 
-        Button commitBtn = buildOpBtn("Fazer Commit", "gm-btn-warn", e -> {
+        Button commitBtn = buildOpBtn(UiComponents.ICON_CHECK + "  Fazer Commit", "gm-btn-warn", e -> {
             String msg = commitMsg.getText().trim();
             if (msg.isBlank()) {
                 showOutput("⚠ Mensagem do commit não pode ser vazia.");
@@ -208,53 +247,50 @@ public class GitOperationsPanel {
             });
         });
 
-        VBox box = new VBox(8, stagingNode, commitMsg, commitBtn);
-        box.setPadding(new Insets(8));
-        TitledPane pane = new TitledPane("Commit", box);
-        pane.setExpanded(true);
-        return pane;
+        VBox box = new VBox(12, stagingNode, commitMsg, commitBtn);
+        card.getChildren().add(box);
+        return card;
     }
 
-    // ---------- Histórico ----------
+    // ========== Histórico ==========
 
     private Node buildHistoryTab() {
-        // Text list tab
         ListView<String> logList = new ListView<>();
-        logList.setPrefHeight(220);
-        logList.getStyleClass().add("gm-output");
-        logList.setStyle("-fx-font-family: monospace; -fx-font-size: 11px;");
+        logList.setPrefHeight(240);
+        logList.getStyleClass().add("gm-log-list");
+        logList.setStyle("-fx-font-family: monospace; -fx-font-size: 12.5px;");
 
-        // Load commits immediately
         List<String> recentCommits = gitService.getRecentCommits(project.getPath(), 20);
         logList.getItems().setAll(recentCommits);
 
-        VBox listBox = new VBox(6, logList);
-        listBox.setPadding(new Insets(8));
-        Tab listTab = new Tab("Lista textual", listBox);
+        VBox listBox = new VBox(10, logList);
+        listBox.setPadding(new Insets(14));
+
+        Tab listTab = new Tab("Lista", listBox);
         listTab.setClosable(false);
 
-        // Graph timeline tab
         GitTimelinePanel timeline = new GitTimelinePanel(project.getPath(), gitService);
-        Tab graphTab = new Tab("Gráfico (timeline)", timeline);
+        Tab graphTab = new Tab("Gráfico", timeline);
         graphTab.setClosable(false);
 
         TabPane historyTabs = new TabPane(listTab, graphTab);
-        historyTabs.setPrefHeight(520);
+        historyTabs.setPrefHeight(480);
+        historyTabs.setStyle("-fx-background-color: transparent;");
         VBox wrapper = new VBox(historyTabs);
         VBox.setVgrow(historyTabs, Priority.ALWAYS);
-        wrapper.setAlignment(Pos.CENTER);
+        wrapper.setPadding(new Insets(10));
+        wrapper.setMinHeight(300);
         return wrapper;
     }
 
-    // ---------- Tags ----------
+    // ========== Tags ==========
 
     private Node buildTagsTab() {
         ListView<String> tagList = new ListView<>();
-        tagList.setPrefHeight(260);
+        tagList.setPrefHeight(280);
+        tagList.setStyle("-fx-background-color: transparent;");
 
-        Button createBtn = new Button("+ Nova Tag");
-        createBtn.getStyleClass().add("gm-btn-primary");
-        createBtn.setOnAction(e -> {
+        Button createBtn = UiComponents.primaryButton(UiComponents.ICON_ADD + "  Nova Tag", () -> {
             TextInputDialog nameDialog = new TextInputDialog();
             ThemeManager.applyToDialog(nameDialog);
             nameDialog.setTitle("Nova Tag");
@@ -280,12 +316,13 @@ public class GitOperationsPanel {
             });
         });
 
-        HBox topBar = new HBox(10, createBtn);
+        HBox topBar = new HBox(12, createBtn);
         topBar.setAlignment(Pos.CENTER_LEFT);
-        topBar.setPadding(new Insets(8, 0, 6, 0));
+        topBar.setPadding(new Insets(10, 0, 8, 0));
 
-        VBox box = new VBox(8, topBar, tagList);
-        box.setPadding(new Insets(14, 16, 16, 16));
+        VBox box = new VBox(12, topBar, tagList);
+        box.setPadding(new Insets(18, 24, 24, 24));
+        box.setMinHeight(200);
 
         loadTags(tagList);
         return box;
@@ -298,15 +335,14 @@ public class GitOperationsPanel {
         }).start();
     }
 
-    // ---------- Stash ----------
+    // ========== Stash ==========
 
     private Node buildStashTab() {
         ListView<String> stashList = new ListView<>();
-        stashList.setPrefHeight(220);
+        stashList.setPrefHeight(240);
+        stashList.setStyle("-fx-background-color: transparent;");
 
-        Button saveBtn = new Button("+ Salvar Stash");
-        saveBtn.getStyleClass().add("gm-btn-primary");
-        saveBtn.setOnAction(e -> {
+        Button saveBtn = UiComponents.primaryButton(UiComponents.ICON_ADD + "  Salvar Stash", () -> {
             TextInputDialog dialog = new TextInputDialog();
             ThemeManager.applyToDialog(dialog);
             dialog.setTitle("Salvar Stash");
@@ -324,8 +360,7 @@ public class GitOperationsPanel {
             });
         });
 
-        Button applyBtn = new Button("Aplicar selecionado");
-        applyBtn.setOnAction(e -> {
+        Button applyBtn = UiComponents.neutralButton("Aplicar", () -> {
             int idx = stashList.getSelectionModel().getSelectedIndex();
             if (idx < 0) return;
             runAsync(() -> {
@@ -335,9 +370,7 @@ public class GitOperationsPanel {
             });
         });
 
-        Button popBtn = new Button("Pop selecionado");
-        popBtn.getStyleClass().add("gm-btn-success");
-        popBtn.setOnAction(e -> {
+        Button popBtn = UiComponents.successButton("Pop", () -> {
             int idx = stashList.getSelectionModel().getSelectedIndex();
             if (idx < 0) return;
             runAsync(() -> {
@@ -350,12 +383,13 @@ public class GitOperationsPanel {
             });
         });
 
-        HBox topBar = new HBox(10, saveBtn, new Spacer(), applyBtn, popBtn);
+        HBox topBar = new HBox(12, saveBtn, UiComponents.spacer(), applyBtn, popBtn);
         topBar.setAlignment(Pos.CENTER_LEFT);
-        topBar.setPadding(new Insets(8, 0, 6, 0));
+        topBar.setPadding(new Insets(10, 0, 8, 0));
 
-        VBox box = new VBox(8, topBar, stashList);
-        box.setPadding(new Insets(14, 16, 16, 16));
+        VBox box = new VBox(12, topBar, stashList);
+        box.setPadding(new Insets(18, 24, 24, 24));
+        box.setMinHeight(200);
 
         loadStashes(stashList);
         return box;
@@ -368,7 +402,7 @@ public class GitOperationsPanel {
         }).start();
     }
 
-    // ---------- Actions ----------
+    // ========== Actions ==========
 
     private void refreshBranches() {
         new Thread(() -> {
@@ -454,8 +488,9 @@ public class GitOperationsPanel {
         passField.setPromptText("Senha / Token de acesso");
 
         GridPane grid = new GridPane();
-        grid.setHgap(10);
-        grid.setVgap(10);
+        grid.setHgap(12);
+        grid.setVgap(12);
+        grid.setPadding(new Insets(8));
         grid.add(new Label("Usuário:"), 0, 0);
         grid.add(userField, 1, 0);
         grid.add(new Label("Senha/Token:"), 0, 1);
@@ -471,19 +506,19 @@ public class GitOperationsPanel {
     private Button buildOpBtn(String text, String styleClass, javafx.event.EventHandler<javafx.event.ActionEvent> handler) {
         Button btn = new Button(text);
         btn.getStyleClass().add(styleClass);
-        btn.setPrefWidth(110);
+        btn.setPrefWidth(140);
         btn.setOnAction(handler);
         return btn;
     }
 
     private void runAsync(java.util.concurrent.Callable<String> task) {
-        showOutput("Executando...");
+        showOutput("⏳ Executando...");
         new Thread(() -> {
             try {
                 String result = task.call();
                 Platform.runLater(() -> showOutput(result));
             } catch (Exception e) {
-                Platform.runLater(() -> showOutput("Erro: " + e.getMessage()));
+                Platform.runLater(() -> showOutput("❌ Erro: " + e.getMessage()));
             }
         }).start();
     }
@@ -492,9 +527,5 @@ public class GitOperationsPanel {
         if (outputArea != null) {
             outputArea.appendText(text + "\n");
         }
-    }
-
-    private static class Spacer extends Region {
-        Spacer() { HBox.setHgrow(this, Priority.ALWAYS); }
     }
 }

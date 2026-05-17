@@ -2,19 +2,29 @@ package com.gitmanager.ui.dialog;
 
 import com.gitmanager.model.GitProject;
 import com.gitmanager.service.ProjectService;
+import com.gitmanager.ui.components.UiComponents;
 import com.gitmanager.ui.theme.ThemeManager;
 import javafx.geometry.Insets;
+import javafx.geometry.Pos;
+import javafx.scene.Scene;
 import javafx.scene.control.*;
 import javafx.scene.layout.GridPane;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.scene.text.Font;
 import javafx.scene.text.FontWeight;
 import javafx.stage.DirectoryChooser;
+import javafx.stage.Modality;
 import javafx.stage.Stage;
+import javafx.stage.StageStyle;
 
 import java.io.File;
 
-public class AddEditProjectDialog extends Dialog<GitProject> {
+/**
+ * Janela modal premium para adicionar ou editar um repositório Git.
+ * Usa Stage customizado para controle total do visual.
+ */
+public class AddEditProjectDialog {
 
     private final GitProject existing;
     private final ProjectService projectService;
@@ -23,47 +33,64 @@ public class AddEditProjectDialog extends Dialog<GitProject> {
     private TextField nameField;
     private TextField pathField;
     private Label errorLabel;
+    private GitProject result;
 
     public AddEditProjectDialog(Stage owner, GitProject existing, ProjectService projectService) {
         this.ownerStage = owner;
         this.existing = existing;
         this.projectService = projectService;
-
-        initOwner(owner);
-        setTitle(existing == null ? "Adicionar Repositório" : "Editar Repositório");
-        setHeaderText(null);
-        buildContent();
-        setResultConverter(this::handleResult);
-
-        ThemeManager.applyToDialog(this);
     }
 
-    private void buildContent() {
+    public GitProject showAndWait() {
         boolean isEdit = existing != null;
 
-        Label title = new Label(isEdit ? "Editar repositório" : "Adicionar repositório Git");
-        title.setFont(Font.font("System", FontWeight.BOLD, 17));
+        Stage stage = new Stage();
+        stage.initOwner(ownerStage);
+        stage.initModality(Modality.APPLICATION_MODAL);
+        stage.initStyle(StageStyle.DECORATED);
+        stage.setTitle(isEdit ? "Editar Repositório" : "Adicionar Repositório");
+        stage.setResizable(false);
 
+        // ---- Título ----
+        Label iconLabel = new Label(isEdit ? UiComponents.ICON_EDIT : UiComponents.ICON_ADD);
+        iconLabel.getStyleClass().add("gm-dialog-icon");
+        
+        Label title = new Label(isEdit ? "Editar Repositório" : "Adicionar Repositório");
+        title.setFont(Font.font("Inter", FontWeight.BOLD, 22));
+        title.getStyleClass().add("gm-dialog-title");
+        
+        HBox titleBox = new HBox(12, iconLabel, title);
+        titleBox.setAlignment(Pos.CENTER_LEFT);
+
+        // ---- Campos ----
+        Label nameLabel = new Label("Nome do projeto");
+        nameLabel.getStyleClass().add("gm-field-label");
+        
         nameField = new TextField(isEdit ? existing.getName() : "");
-        nameField.setPromptText("Nome/alias do projeto (ex: Meu Backend)");
-        nameField.setPrefWidth(380);
+        nameField.setPromptText("Ex: Meu Backend");
+        nameField.setPrefWidth(440);
+        nameField.setStyle("-fx-font-size: 14px;");
+
+        Label pathLabelText = new Label("Diretório do repositório");
+        pathLabelText.getStyleClass().add("gm-field-label");
 
         pathField = new TextField(isEdit ? existing.getPath() : "");
         pathField.setPromptText("Caminho absoluto do diretório");
-        pathField.setPrefWidth(310);
+        pathField.setPrefWidth(360);
+        pathField.setStyle("-fx-font-size: 14px;");
         if (isEdit) {
-            pathField.setDisable(true); // path é a chave, não permite editar
+            pathField.setDisable(true);
+            pathField.setStyle(pathField.getStyle() + "-fx-opacity: 0.6;");
         }
 
-        Button browseBtn = new Button("Procurar...");
-        browseBtn.setOnAction(e -> {
+        Button browseBtn = UiComponents.neutralButton("\uD83D\uDCC1  Procurar...", () -> {
             DirectoryChooser chooser = new DirectoryChooser();
             chooser.setTitle("Selecionar diretório do repositório Git");
             if (!pathField.getText().isBlank()) {
                 File current = new File(pathField.getText());
                 if (current.exists()) chooser.setInitialDirectory(current);
             }
-            File selected = chooser.showDialog(ownerStage);
+            File selected = chooser.showDialog(stage);
             if (selected != null) {
                 pathField.setText(selected.getAbsolutePath());
             }
@@ -72,56 +99,80 @@ public class AddEditProjectDialog extends Dialog<GitProject> {
             browseBtn.setDisable(true);
         }
 
-        errorLabel = new Label();
-        errorLabel.getStyleClass().add("gm-error-label");
+        errorLabel = new Label("");
+        errorLabel.setStyle("-fx-text-fill: #ef4444; -fx-font-size: 12.5px; -fx-font-weight: bold;");
+        errorLabel.setMaxWidth(460);
         errorLabel.setWrapText(true);
-        errorLabel.setMaxWidth(400);
 
+        // Grid
         GridPane grid = new GridPane();
-        grid.setHgap(10);
+        grid.setHgap(14);
         grid.setVgap(10);
-        grid.add(new Label("Nome:"), 0, 0);
-        grid.add(nameField, 1, 0, 2, 1);
-        grid.add(new Label("Diretório:"), 0, 1);
-        grid.add(pathField, 1, 1);
-        grid.add(browseBtn, 2, 1);
-        Label hint = new Label("O diretório será validado: deve existir e conter um .git válido.");
-        hint.getStyleClass().add("gm-hint-label");
+        grid.add(nameLabel, 0, 0, 3, 1);
+        grid.add(nameField, 0, 1, 3, 1);
+        grid.add(pathLabelText, 0, 2, 3, 1);
+        grid.add(pathField, 0, 3);
+        grid.add(browseBtn, 1, 3);
 
-        VBox content = new VBox(14, title, grid, hint, errorLabel);
-        content.setPadding(new Insets(20));
-        content.setPrefWidth(480);
+        Label hint = UiComponents.hint("O diretório será validado: deve existir e conter um .git válido.");
+        hint.setWrapText(true);
 
-        getDialogPane().setContent(content);
-
-        ButtonType saveType = new ButtonType(isEdit ? "Salvar" : "Adicionar", ButtonBar.ButtonData.OK_DONE);
-        getDialogPane().getButtonTypes().addAll(saveType, ButtonType.CANCEL);
-
-        Button saveBtn = (Button) getDialogPane().lookupButton(saveType);
-        saveBtn.addEventFilter(javafx.event.ActionEvent.ACTION, e -> {
-            if (!validate()) e.consume();
+        // Botões de ação
+        Button cancelBtn = new Button("Cancelar");
+        cancelBtn.getStyleClass().add("gm-btn-neutral");
+        cancelBtn.setOnAction(e -> {
+            result = null;
+            stage.close();
         });
+
+        Button saveBtn = new Button(isEdit ? "Salvar" : "Adicionar");
+        saveBtn.getStyleClass().add("gm-btn-primary");
+        saveBtn.setOnAction(e -> {
+            if (validate()) {
+                result = handleResult();
+                if (result != null) {
+                    stage.close();
+                }
+            }
+        });
+
+        HBox buttonBox = new HBox(12, cancelBtn, saveBtn);
+        buttonBox.setAlignment(Pos.CENTER_RIGHT);
+        buttonBox.setPadding(new Insets(8, 0, 0, 0));
+
+        VBox content = new VBox(18, titleBox, grid, hint, errorLabel, buttonBox);
+        content.setPadding(new Insets(32));
+        content.setPrefWidth(580);
+        content.setAlignment(Pos.TOP_LEFT);
+        content.getStyleClass().add("gm-dialog-content");
+
+        Scene scene = new Scene(content);
+        ThemeManager.registerScene(scene);
+        stage.setScene(scene);
+        stage.sizeToScene();
+
+        stage.showAndWait();
+        return result;
     }
 
     private boolean validate() {
         errorLabel.setText("");
         if (nameField.getText().isBlank()) {
-            errorLabel.setText("O nome do projeto é obrigatório.");
+            errorLabel.setText("⚠  O nome do projeto é obrigatório.");
             return false;
         }
         if (pathField.getText().isBlank()) {
-            errorLabel.setText("Selecione o diretório do repositório.");
+            errorLabel.setText("⚠  Selecione o diretório do repositório.");
             return false;
         }
         if (!projectService.getGitService().isValidGitRepo(pathField.getText().trim())) {
-            errorLabel.setText("O diretório selecionado não é um repositório Git válido (não contém .git).");
+            errorLabel.setText("⚠  O diretório selecionado não é um repositório Git válido (não contém .git).");
             return false;
         }
         return true;
     }
 
-    private GitProject handleResult(ButtonType type) {
-        if (type.getButtonData() != ButtonBar.ButtonData.OK_DONE) return null;
+    private GitProject handleResult() {
         try {
             if (existing == null) {
                 return projectService.addProject(
@@ -134,10 +185,10 @@ public class AddEditProjectDialog extends Dialog<GitProject> {
                 return projectService.updateProject(existing);
             }
         } catch (IllegalArgumentException e) {
-            errorLabel.setText(e.getMessage());
+            errorLabel.setText("⚠  " + e.getMessage());
             return null;
         } catch (Exception e) {
-            errorLabel.setText("Erro ao salvar: " + e.getMessage());
+            errorLabel.setText("❌  Erro ao salvar: " + e.getMessage());
             return null;
         }
     }
