@@ -1,6 +1,7 @@
 package com.gitmanager.ui.dashboard;
 
 import com.gitmanager.model.GitProject;
+import com.gitmanager.ui.components.UiComponents;
 import com.gitmanager.ui.theme.ThemeManager;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
@@ -12,7 +13,26 @@ import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Circle;
 
+/**
+ * Cell renderer premium para itens de projeto na lista.
+ * Exibe card com indicador de status, nome, branch e resumo de status.
+ */
 public class ProjectListCell extends ListCell<GitProject> {
+
+    private HBox content;
+    private Circle statusDot;
+    private Label nameLabel;
+    private Label subtitleLabel;
+    private Label statusBadge;
+
+    public ProjectListCell() {
+        setOnMouseClicked(e -> {
+            if (!isEmpty() && getItem() != null && getListView() != null) {
+                getListView().getSelectionModel().select(getItem());
+                getListView().requestFocus();
+            }
+        });
+    }
 
     @Override
     protected void updateItem(GitProject project, boolean empty) {
@@ -20,42 +40,94 @@ public class ProjectListCell extends ListCell<GitProject> {
         if (empty || project == null) {
             setGraphic(null);
             setText(null);
+            setStyle("-fx-background-color: transparent;");
             return;
         }
 
-        boolean dark = ThemeManager.isDark();
+        if (content == null) {
+            statusDot = new Circle(6);
+            nameLabel = new Label();
+            nameLabel.getStyleClass().add("gm-project-name");
+            subtitleLabel = new Label();
+            subtitleLabel.getStyleClass().add("gm-project-subtitle");
 
-        Circle statusDot = new Circle(6);
-        if (!project.isExistsOnDisk()) {
-            statusDot.setFill(Color.web("#e74c3c")); // vermelho = não existe
-        } else if (!project.isHasGit()) {
-            statusDot.setFill(Color.web("#e67e22")); // laranja = sem git
-        } else {
-            statusDot.setFill(Color.web("#27ae60")); // verde = OK
+            VBox textBox = new VBox(4, nameLabel, subtitleLabel);
+            VBox.setVgrow(textBox, Priority.ALWAYS);
+
+            statusBadge = new Label();
+
+            content = new HBox(12, statusDot, textBox, UiComponents.spacer(), statusBadge);
+            content.setAlignment(Pos.CENTER_LEFT);
+            content.setPadding(new Insets(12, 14, 12, 14));
+            content.getStyleClass().add("gm-project-card");
         }
 
-        Label nameLabel = new Label(project.getName());
-        nameLabel.setStyle("-fx-font-weight: bold; -fx-font-size: 13px;");
+        // Atualiza dados
+        if (!project.isExistsOnDisk()) {
+            statusDot.setRadius(6);
+            statusDot.getStyleClass().setAll("gm-dot-danger");
+        } else if (!project.isHasGit()) {
+            statusDot.setRadius(6);
+            statusDot.getStyleClass().setAll("gm-dot-warning");
+        } else {
+            statusDot.setRadius(6);
+            statusDot.getStyleClass().setAll("gm-dot-success");
+        }
 
-        Label branchLabel = new Label(buildSubtitle(project));
-        branchLabel.getStyleClass().add("gm-subtitle-label");
+        nameLabel.setText(project.getName());
+        subtitleLabel.setText(buildSubtitle(project));
 
-        VBox text = new VBox(2, nameLabel, branchLabel);
-        VBox.setVgrow(text, Priority.ALWAYS);
+        Label newBadge = buildStatusBadge(project);
+        statusBadge.setText(newBadge.getText());
+        statusBadge.getStyleClass().setAll(newBadge.getStyleClass());
 
-        HBox cell = new HBox(10, statusDot, text);
-        cell.setAlignment(Pos.CENTER_LEFT);
-        cell.setPadding(new Insets(6, 8, 6, 8));
+        applySelectionStyle();
 
-        setGraphic(cell);
+        setGraphic(content);
         setText(null);
+        setStyle("-fx-background-color: transparent; -fx-padding: 3 4;");
+    }
+
+    @Override
+    public void updateSelected(boolean selected) {
+        super.updateSelected(selected);
+        applySelectionStyle();
+    }
+
+    private void applySelectionStyle() {
+        if (content == null) return;
+        if (isSelected()) {
+            if (!content.getStyleClass().contains("gm-project-card-selected")) {
+                content.getStyleClass().remove("gm-project-card");
+                content.getStyleClass().add("gm-project-card-selected");
+            }
+        } else {
+            if (!content.getStyleClass().contains("gm-project-card")) {
+                content.getStyleClass().remove("gm-project-card-selected");
+                content.getStyleClass().add("gm-project-card");
+            }
+        }
     }
 
     private String buildSubtitle(GitProject p) {
-        if (!p.isExistsOnDisk()) return "⚠ Diretório não encontrado";
-        if (!p.isHasGit()) return "⚠ Sem repositório git";
+        if (!p.isExistsOnDisk()) return "Diretório não encontrado";
+        if (!p.isHasGit()) return "Sem repositório git";
         String branch = p.getCurrentBranch() != null ? p.getCurrentBranch() : "?";
         String status = p.getStatusSummary() != null ? p.getStatusSummary() : "";
-        return "⎇ " + branch + "  ·  " + status;
+        return UiComponents.ICON_BRANCH + " " + branch + "   ·   " + status;
+    }
+
+    private Label buildStatusBadge(GitProject p) {
+        if (!p.isAvailable()) {
+            return UiComponents.badgeError("OFF");
+        }
+        String status = p.getStatusSummary();
+        if (status == null || status.equals("Limpo")) {
+            return UiComponents.badgeOk("OK");
+        }
+        if (status.contains("alteração")) {
+            return UiComponents.badgeWarn(status);
+        }
+        return UiComponents.badgeNeutral(status);
     }
 }

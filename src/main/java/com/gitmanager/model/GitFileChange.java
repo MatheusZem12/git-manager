@@ -3,25 +3,23 @@ package com.gitmanager.model;
 public class GitFileChange {
 
     public enum Type {
-        ADDED("Novo", "#27ae60", "#2ea043"),
-        MODIFIED("Modificado", "#e67e22", "#d7ba7d"),
-        DELETED("Deletado", "#e74c3c", "#f85149"),
-        RENAMED("Renomeado", "#2980b9", "#79c0ff"),
-        CONFLICTING("Conflito", "#c0392b", "#f85149"),
-        UNTRACKED("Não rastreado", "#7f8c8d", "#a0a0a0");
+        ADDED("Novo", "#2ea043"),
+        MODIFIED("Modificado", "#d7ba7d"),
+        DELETED("Deletado", "#f85149"),
+        RENOMEADO("Renomeado", "#79c0ff"),
+        CONFLICTING("Conflito", "#f85149"),
+        UNTRACKED("Não rastreado", "#a0a0a0");
 
         private final String label;
-        private final String colorLight;
-        private final String colorDark;
+        private final String color;
 
-        Type(String label, String colorLight, String colorDark) {
+        Type(String label, String color) {
             this.label = label;
-            this.colorLight = colorLight;
-            this.colorDark = colorDark;
+            this.color = color;
         }
 
         public String getLabel() { return label; }
-        public String getColor(boolean dark) { return dark ? colorDark : colorLight; }
+        public String getColor() { return color; }
     }
 
     private final String path;
