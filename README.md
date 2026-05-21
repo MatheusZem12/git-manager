@@ -1,100 +1,145 @@
 # Git Manager
 
-Gerenciador local de repositórios Git com interface gráfica.
+Gerenciador local de repositórios Git com interface gráfica moderna em **Flutter Desktop** e backend **Java REST**.
 
 ## Tecnologias
 
-- **Java 17** + **JavaFX 21** (GUI)
-- **JGit** (operações Git programáticas)
-- **Maven** (build)
+- **Flutter 3.27** — Interface desktop moderna (Material 3, dark theme, animações)
+- **Dart** — Cliente HTTP consumindo API REST
+- **Java 17** — Backend e regra de negócio
+- **Javalin 6** — Servidor REST embutido
+- **JGit** — Operações Git programáticas
+- **Jackson** — Serialização JSON
+- **Maven** — Build do backend Java
+
+## Arquitetura
+
+```
+┌─────────────────────┐      HTTP REST       ┌─────────────────────┐
+│   Flutter Desktop   │ ◄──────────────────► │   Java Backend      │
+│   (UI Moderna)      │   localhost:18765    │   (Regra de Negócio)│
+└─────────────────────┘                      └─────────────────────┘
+```
+
+O **Java** continua como regra de negócio (GitService, ProjectService, models).  
+O **Flutter** substituiu a UI JavaFX antiga, consumindo operações via API REST local.
 
 ## Pré-requisitos
 
 - Java 17+
 - Maven 3.8+
+- Flutter 3.27+ (com Linux desktop enabled)
 
 ## Executar
 
-```bash
-mvn javafx:run
-```
-
-Ou gerar o JAR e executar:
+### Opção rápida (script automático)
 
 ```bash
-mvn package
-java -jar target/git-manager-1.0.0.jar
+./start.sh
 ```
 
-## Gerar instalador .exe (Windows)
+O script `start.sh` compila tudo automaticamente, inicia o backend Java e depois o app Flutter.
 
-O projeto usa o `jpackage` (ferramenta do JDK) para criar um instalador `.exe` nativo para Windows.
+### Manualmente
 
-### Opção 1: GitHub Actions (recomendado)
-
-A cada push na branch `DEV` ou `main`, o workflow [`.github/workflows/build-windows.yml`](.github/workflows/build-windows.yml) executa automaticamente no Windows e gera o instalador como artefato para download.
-
-**Como baixar:**
-1. Vá na aba **Actions** do repositório no GitHub
-2. Clique no workflow mais recente
-3. Baixe o artefato `git-manager-windows-installer`
-
-### Opção 2: Build local no Windows
-
-1. Instale o JDK 17 com JavaFX incluso (recomendado: [BellSoft Liberica JDK Full](https://bell-sw.com/pages/downloads/#/java-17-lts))
-2. Clone o repositório
-3. Execute:
+**1. Compile o backend Java:**
 
 ```bash
-mvn clean package -Pwindows
+mvn package -DskipTests
 ```
 
-O instalador `.exe` será gerado em:
-
-```
-target/dist/GitManager-1.0.0.exe
-```
-
-> **Nota:** o `jpackage` no Windows pode exigir o [WiX Toolset v3](https://wixtoolset.org/docs/v3/) instalado para gerar o `.exe`.
-
-### Opção 3: Outras plataformas (Linux/Mac)
-
-Para gerar um instalador nativo no Linux ou Mac:
+**2. Compile o app Flutter (Linux):**
 
 ```bash
-mvn clean package -Pjpackage
+cd git_manager_ui
+flutter build linux --debug
 ```
 
-O tipo de instalador depende do SO:
-- **Linux:** `.deb` ou `.rpm`
-- **Mac:** `.dmg` ou `.pkg`
+**3. Inicie o backend:**
+
+```bash
+java -cp target/git-manager-1.0.0.jar com.gitmanager.ApiMain
+```
+
+**4. Em outro terminal, inicie o Flutter:**
+
+```bash
+./git_manager_ui/build/linux/x64/debug/bundle/git_manager_ui
+```
 
 ## Funcionalidades
 
-### Gerenciamento de repositórios
-- Adicionar repositórios Git via seletor de diretório
-- Validação automática de `.git` antes de salvar e ao visualizar
-- Nomear projetos com alias personalizado
-- Adicionar notas/observações por projeto
-- Remover projetos da lista (apaga a entrada local, não o diretório)
+### Interface Flutter Moderna
+- **Tema escuro premium** — inspirado em Linear/GitHub Dark, com glassmorphism, cards elevados e sombras
+- **Dashboard** — lista de repositórios em cards com indicadores de status, busca em tempo real e estatísticas
+- **Detalhes do projeto** — abas para Visão Geral, Histórico, Tags e Stash
+- **Staging visual** — lista de arquivos alterados com checkboxes, preview de diff e commit integrado
+- **Timeline gráfica** — visualização de commits com branches coloridas e conexões
+- **Animações** — transições suaves, hover effects e glow nos elementos
 
-### Indicador de status (lista lateral)
-- 🟢 Verde — diretório existe e contém repositório git válido
-- 🟠 Laranja — diretório existe mas sem `.git`
-- 🔴 Vermelho — diretório não encontrado
+### Operações Git (via JGit no backend)
+- **Commit** — selecionar arquivos e mensagem
+- **Push / Pull / Fetch** — com suporte a credenciais
+- **Checkout / Nova branch**
+- **Tags** — criar e listar
+- **Stash** — save, pop, apply
+- **Histórico** — lista e gráfico de commits
 
-### Operações Git (via JGit)
-- **Commit** — com opção de `git add -A` automático, nome/email do autor
-- **Push** — com suporte a credenciais (usuário/senha ou token)
-- **Pull** — com merge automático
-- **Fetch** — atualiza referências remotas
-- **Checkout** — trocar de branch com seletor
-- **Nova branch** — criar e mudar para nova branch
-- **Histórico** — últimos 20 commits do repositório
+## API REST Endpoints
+
+| Método | Endpoint | Descrição |
+|--------|----------|-----------|
+| GET | `/api/health` | Health check |
+| GET | `/api/projects` | Listar projetos |
+| POST | `/api/projects` | Adicionar projeto |
+| PUT | `/api/projects` | Atualizar projeto |
+| DELETE | `/api/projects` | Remover projeto |
+| GET | `/api/git/status` | Status do repo |
+| GET | `/api/git/branches` | Listar branches |
+| GET | `/api/git/commits` | Commits recentes |
+| GET | `/api/git/graph` | Grafo de commits |
+| GET | `/api/git/changes` | Arquivos alterados |
+| POST | `/api/git/commit` | Fazer commit |
+| POST | `/api/git/push` | Push |
+| POST | `/api/git/pull` | Pull |
+| POST | `/api/git/fetch` | Fetch |
+| POST | `/api/git/checkout` | Checkout |
+| POST | `/api/git/create-branch` | Nova branch |
+| POST | `/api/git/create-tag` | Nova tag |
+| POST | `/api/git/stash-*` | Operações stash |
+
+## Estrutura do projeto
+
+```
+├── pom.xml                          # Build Maven (Java backend)
+├── start.sh                         # Launcher automático
+├── src/main/java/com/gitmanager/
+│   ├── ApiMain.java                 # Entry point do servidor REST
+│   ├── api/
+│   │   └── RestServer.java          # API Javalin (endpoints REST)
+│   ├── model/                       # Entidades (GitProject, GitCommit, etc.)
+│   ├── service/                     # Regra de negócio (GitService, ProjectService)
+│   └── ui/                          # UI antiga JavaFX (mantida para compatibilidade)
+│
+└── git_manager_ui/                  # Projeto Flutter Desktop
+    ├── lib/
+    │   ├── main.dart                # Entry point Flutter
+    │   ├── theme.dart               # Tema escuro moderno
+    │   ├── models/                  # Modelos Dart
+    │   ├── services/
+    │   │   └── api_service.dart     # Cliente HTTP para Java REST
+    │   ├── screens/
+    │   │   ├── dashboard_screen.dart
+    │   │   ├── project_detail_screen.dart
+    │   │   ├── staging_screen.dart
+    │   │   └── timeline_screen.dart
+    │   └── widgets/                 # Componentes reutilizáveis
+    └── linux/                       # Build Linux desktop
+```
 
 ## Persistência
 
-Os diretórios cadastrados são salvos em um arquivo texto simples:
+Os diretórios cadastrados são salvos em:
 
 ```
 ~/.git-manager/repos.txt
@@ -102,25 +147,8 @@ Os diretórios cadastrados são salvos em um arquivo texto simples:
 
 Formato: `nome|caminho|notas`
 
-Não há banco de dados, login ou qualquer dependência externa.
+## Notas
 
-## Estrutura do projeto
-
-```
-src/main/java/com/gitmanager/
-├── App.java                        # Ponto de entrada JavaFX
-├── model/
-│   └── GitProject.java             # Entidade projeto Git
-├── repository/
-│   └── GitProjectFileRepository.java  # Persistência em arquivo txt
-├── service/
-│   ├── GitService.java             # Operações JGit
-│   └── ProjectService.java         # Lógica de negócio
-└── ui/
-    ├── dashboard/
-    │   ├── DashboardScreen.java    # Tela principal
-    │   └── ProjectListCell.java    # Célula customizada da lista
-    └── dialog/
-        ├── AddEditProjectDialog.java  # Adicionar/editar repo
-        └── GitOperationsPanel.java    # Painel de operações git
-```
+- O backend REST roda na porta **18765** (localhost apenas).
+- O Flutter se comunica com o Java via HTTP — não há dependência direta de código.
+- A UI JavaFX antiga ainda está presente em `src/main/java/com/gitmanager/ui/` mas não é mais usada como entry point principal.

@@ -195,7 +195,7 @@ public class StagingPanel {
             case ADDED -> "+";
             case MODIFIED -> "~";
             case DELETED -> "-";
-            case RENAMED -> "→";
+            case RENOMEADO -> "→";
             case CONFLICTING -> "!";
             case UNTRACKED -> "?";
         };
