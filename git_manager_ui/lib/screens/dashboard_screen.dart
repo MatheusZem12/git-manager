@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:file_selector/file_selector.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import '../models/git_project.dart';
 import '../services/api_service.dart';
 import '../theme.dart';
@@ -40,7 +41,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       });
     } catch (e) {
       setState(() => _loading = false);
-      _showError('Erro ao carregar projetos: $e');
+      _showError('${AppLocalizations.of(context)!.errorLoadingProjects}: $e');
     }
   }
 
@@ -75,9 +76,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.bgElevated,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
-          'Adicionar Repositório',
-          style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold),
+        title: Text(
+          AppLocalizations.of(context)!.addRepo,
+          style: const TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold),
         ),
         content: ConstrainedBox(
           constraints: const BoxConstraints(minWidth: 400),
@@ -99,9 +100,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     child: TextField(
                       controller: pathCtrl,
                       style: const TextStyle(color: AppTheme.text),
-                      decoration: const InputDecoration(
-                        labelText: 'Caminho absoluto',
-                        prefixIcon: Icon(Icons.folder_open_outlined),
+                      decoration: InputDecoration(
+                        labelText: AppLocalizations.of(context)!.projectPath,
+                        prefixIcon: const Icon(Icons.folder_open_outlined),
                       ),
                     ),
                   ),
@@ -114,7 +115,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       }
                     },
                     icon: const Icon(Icons.folder_copy_outlined, size: 18),
-                    label: const Text('Procurar'),
+                    label: Text(AppLocalizations.of(context)!.browse),
                   ),
                 ],
               ),
@@ -124,7 +125,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
+            child: Text(AppLocalizations.of(context)!.cancel),
           ),
           ElevatedButton(
             onPressed: () async {
@@ -137,7 +138,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 _showError(e.toString());
               }
             },
-            child: const Text('Adicionar'),
+            child: Text(AppLocalizations.of(context)!.add),
           ),
         ],
       ),
@@ -150,18 +151,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
       builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.bgElevated,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
-          'Remover Repositório',
-          style: TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold),
+        title: Text(
+          AppLocalizations.of(context)!.removeRepo,
+          style: const TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold),
         ),
         content: Text(
-          'Remover "${project.name}" da lista?\n\nO diretório no disco não será alterado.',
+          'Remover "${project.name}" da lista?\n\n${AppLocalizations.of(context)!.removeRepoConfirm}',
           style: const TextStyle(color: AppTheme.textSecondary),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancelar'),
+            child: Text(AppLocalizations.of(context)!.cancel),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppTheme.danger),
@@ -173,7 +174,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
               }
               await _loadProjects();
             },
-            child: const Text('Remover'),
+            child: Text(AppLocalizations.of(context)!.remove),
           ),
         ],
       ),
@@ -182,171 +183,231 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final available = _projects.where((p) => p.isAvailable).length;
-    final withChanges = _projects.where((p) => p.isAvailable && p.statusSummary != 'Limpo').length;
+    final withChanges = _projects.where((p) => p.isAvailable && p.statusSummary != l10n.ok).length;
     final unavailable = _projects.length - available;
 
-    return Scaffold(
-      backgroundColor: AppTheme.bg,
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final isWide = constraints.maxWidth > 900;
-          return Row(
-            children: [
-              // Sidebar
-              Container(
-                width: isWide ? 340 : 280,
-                decoration: BoxDecoration(
-                  color: AppTheme.bgElevated,
-                  border: Border(
-                    right: BorderSide(color: AppTheme.borderStrong.withValues(alpha: 0.3)),
-                  ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final width = constraints.maxWidth;
+        final isCompact = width < 600;
+        final isMedium = width >= 600 && width < 1100;
+        final isWide = width >= 1100;
+
+        Widget sidebarContent = _buildSidebarContent(
+          l10n: l10n,
+          available: available,
+          withChanges: withChanges,
+          unavailable: unavailable,
+          compact: isCompact,
+        );
+
+        Widget body = Container(
+          color: AppTheme.bg,
+          child: _selectedProject == null
+              ? const _WelcomeArea()
+              : ProjectDetailScreen(
+                  project: _selectedProject!,
+                  api: _api,
+                  inline: true,
                 ),
-                child: Column(
-                  children: [
-                    // Header
-                    GlassContainer(
-                      padding: const EdgeInsets.all(20),
-                      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: AppTheme.accent.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Icon(
-                                  Icons.folder_copy_outlined,
-                                  color: AppTheme.accent,
-                                  size: 24,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              const Expanded(
-                                child: Text(
-                                  'Git Manager',
-                                  style: TextStyle(
-                                    color: AppTheme.text,
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: -0.5,
-                                  ),
-                                ),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.refresh, color: AppTheme.textMuted, size: 20),
-                                onPressed: _loadProjects,
-                                tooltip: 'Atualizar',
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 20),
-                          // Search
-                          TextField(
-                            onChanged: (v) {
-                              setState(() {
-                                _search = v;
-                                _applyFilter();
-                              });
-                            },
-                            style: const TextStyle(color: AppTheme.text),
-                            decoration: InputDecoration(
-                              hintText: 'Buscar repositório...',
-                              prefixIcon: const Icon(Icons.search, color: AppTheme.textMuted),
-                              suffixIcon: _search.isNotEmpty
-                                  ? IconButton(
-                                      icon: const Icon(Icons.clear, color: AppTheme.textMuted, size: 18),
-                                      onPressed: () {
-                                        setState(() {
-                                          _search = '';
-                                          _applyFilter();
-                                        });
-                                      },
-                                    )
-                                  : null,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    // Stats
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
-                        children: [
-                          _statItem(_projects.length.toString(), 'TOTAL', AppTheme.text),
-                          _statItem(available.toString(), 'OK', AppTheme.success),
-                          _statItem(withChanges.toString(), 'ALT', AppTheme.warning),
-                          _statItem(
-                            unavailable.toString(),
-                            'INDISP.',
-                            unavailable > 0 ? AppTheme.danger : AppTheme.textMuted,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Divider(height: 1),
-                    // List
-                    Expanded(
-                      child: _loading
-                          ? const Center(
-                              child: CircularProgressIndicator(color: AppTheme.accent),
-                            )
-                          : _filtered.isEmpty
-                              ? const _EmptyState()
-                              : Scrollbar(
-                                  child: ListView.builder(
-                                    padding: const EdgeInsets.all(12),
-                                    itemCount: _filtered.length,
-                                    itemBuilder: (context, index) {
-                                      final project = _filtered[index];
-                                      final isSelected = _selectedProject?.path == project.path;
-                                      return _ProjectCard(
-                                        project: project,
-                                        isSelected: isSelected,
-                                        onTap: () => setState(() => _selectedProject = project),
-                                        onDelete: () => _confirmDelete(project),
-                                      );
-                                    },
-                                  ),
-                                ),
-                    ),
-                    // Botão Adicionar Repositório (na sidebar, não flutuante)
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: AppTheme.bgElevated,
-                        border: Border(
-                          top: BorderSide(color: AppTheme.borderStrong.withValues(alpha: 0.3)),
-                        ),
-                      ),
-                      child: _AddRepoButton(onTap: _showAddDialog),
+        );
+
+        if (isWide) {
+          return Scaffold(
+            backgroundColor: AppTheme.bg,
+            body: Row(
+              children: [
+                SizedBox(width: 340, child: sidebarContent),
+                Expanded(child: body),
+              ],
+            ),
+          );
+        }
+
+        if (isMedium) {
+          return Scaffold(
+            backgroundColor: AppTheme.bg,
+            body: Row(
+              children: [
+                NavigationRail(
+                  backgroundColor: AppTheme.bgElevated,
+                  selectedIndex: 0,
+                  labelType: NavigationRailLabelType.selected,
+                  destinations: [
+                    NavigationRailDestination(
+                      icon: const Icon(Icons.folder_copy_outlined, color: AppTheme.textMuted),
+                      selectedIcon: const Icon(Icons.folder_copy_outlined, color: AppTheme.accent),
+                      label: Text(l10n.appTitle, style: const TextStyle(fontSize: 10)),
                     ),
                   ],
+                  trailing: IconButton(
+                    icon: const Icon(Icons.add, color: AppTheme.text),
+                    onPressed: _showAddDialog,
+                    tooltip: l10n.addRepo,
+                  ),
                 ),
-              ),
-              // Detail area
-              Expanded(
-                child: Container(
-                  color: AppTheme.bg,
-                  child: _selectedProject == null
-                      ? const _WelcomeArea()
-                      : ProjectDetailScreen(
-                          project: _selectedProject!,
-                          api: _api,
-                          inline: true,
-                        ),
+                Expanded(
+                  child: Row(
+                    children: [
+                      SizedBox(width: 280, child: sidebarContent),
+                      Expanded(child: body),
+                    ],
+                  ),
                 ),
+              ],
+            ),
+          );
+        }
+
+        // Compact: drawer + body
+        return Scaffold(
+          backgroundColor: AppTheme.bg,
+          appBar: AppBar(
+            backgroundColor: AppTheme.bgElevated,
+            elevation: 0,
+            title: Text(l10n.appTitle),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.refresh, color: AppTheme.textMuted),
+                onPressed: _loadProjects,
+                tooltip: l10n.refresh,
               ),
             ],
-          );
-        },
+          ),
+          drawer: Drawer(
+            backgroundColor: AppTheme.bgElevated,
+            child: sidebarContent,
+          ),
+          body: body,
+        );
+      },
+    );
+  }
+
+  Widget _buildSidebarContent({
+    required AppLocalizations l10n,
+    required int available,
+    required int withChanges,
+    required int unavailable,
+    required bool compact,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.bgElevated,
+        border: compact
+            ? null
+            : Border(right: BorderSide(color: AppTheme.borderStrong.withValues(alpha: 0.3))),
+      ),
+      child: Column(
+        children: [
+          if (!compact)
+            GlassContainer(
+              padding: const EdgeInsets.all(20),
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(10),
+                        decoration: BoxDecoration(
+                          color: AppTheme.accent.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(Icons.folder_copy_outlined, color: AppTheme.accent, size: 24),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          l10n.appTitle,
+                          style: const TextStyle(
+                            color: AppTheme.text, fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: -0.5,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.refresh, color: AppTheme.textMuted, size: 20),
+                        onPressed: _loadProjects,
+                        tooltip: l10n.refresh,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  TextField(
+                    onChanged: (v) {
+                      setState(() {
+                        _search = v;
+                        _applyFilter();
+                      });
+                    },
+                    style: const TextStyle(color: AppTheme.text),
+                    decoration: InputDecoration(
+                      hintText: l10n.searchRepo,
+                      prefixIcon: const Icon(Icons.search, color: AppTheme.textMuted),
+                      suffixIcon: _search.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(Icons.clear, color: AppTheme.textMuted, size: 18),
+                              onPressed: () => setState(() { _search = ''; _applyFilter(); }),
+                            )
+                          : null,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          if (!compact)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _statItem(_projects.length.toString(), l10n.total, AppTheme.text),
+                  _statItem(available.toString(), l10n.ok, AppTheme.success),
+                  _statItem(withChanges.toString(), l10n.alt, AppTheme.warning),
+                  _statItem(
+                    unavailable.toString(),
+                    l10n.unavailable,
+                    unavailable > 0 ? AppTheme.danger : AppTheme.textMuted,
+                  ),
+                ],
+              ),
+            ),
+          if (!compact) const Divider(height: 1),
+          Expanded(
+            child: _loading
+                ? const Center(child: CircularProgressIndicator(color: AppTheme.accent))
+                : _filtered.isEmpty
+                    ? const _EmptyState()
+                    : Scrollbar(
+                        child: ListView.builder(
+                          padding: const EdgeInsets.all(12),
+                          itemCount: _filtered.length,
+                          itemBuilder: (context, index) {
+                            final project = _filtered[index];
+                            final isSelected = _selectedProject?.path == project.path;
+                            return _ProjectCard(
+                              project: project,
+                              isSelected: isSelected,
+                              onTap: () => setState(() => _selectedProject = project),
+                              onDelete: () => _confirmDelete(project),
+                            );
+                          },
+                        ),
+                      ),
+          ),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppTheme.bgElevated,
+              border: Border(top: BorderSide(color: AppTheme.borderStrong.withValues(alpha: 0.3))),
+            ),
+            child: _AddRepoButton(onTap: _showAddDialog),
+          ),
+        ],
       ),
     );
   }
@@ -390,12 +451,12 @@ class _AddRepoButton extends StatelessWidget {
           curve: Curves.easeOut,
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           decoration: BoxDecoration(
-            color: Colors.black,
+            color: AppTheme.surface,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppTheme.borderStrong.withValues(alpha: 0.5)),
+            border: Border.all(color: AppTheme.borderStrong.withValues(alpha: 0.4)),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.4),
+                color: AppTheme.bg.withValues(alpha: 0.5),
                 blurRadius: 8,
                 offset: const Offset(0, 2),
               ),
@@ -406,8 +467,8 @@ class _AddRepoButton extends StatelessWidget {
             children: [
               const Icon(Icons.add_rounded, color: AppTheme.text, size: 20),
               const SizedBox(width: 8),
-              const Text(
-                'Adicionar Repositório',
+              Text(
+                AppLocalizations.of(context)!.addRepo,
                 style: TextStyle(
                   color: AppTheme.text,
                   fontSize: 14,
@@ -433,13 +494,13 @@ class _EmptyState extends StatelessWidget {
         children: [
           Icon(Icons.inbox_outlined, size: 48, color: AppTheme.textMuted.withValues(alpha: 0.5)),
           const SizedBox(height: 16),
-          const Text(
-            'Nenhum repositório',
+          Text(
+            AppLocalizations.of(context)!.noRepo,
             style: TextStyle(color: AppTheme.textMuted, fontSize: 15, fontWeight: FontWeight.w500),
           ),
           const SizedBox(height: 4),
           Text(
-            'Use o botão abaixo para cadastrar um diretório git.',
+            AppLocalizations.of(context)!.noRepoHint,
             style: TextStyle(color: AppTheme.textMuted.withValues(alpha: 0.6), fontSize: 12),
           ),
         ],
@@ -470,8 +531,8 @@ class _WelcomeArea extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 28),
-          const Text(
-            'Selecione um repositório',
+          Text(
+            AppLocalizations.of(context)!.selectRepo,
             style: TextStyle(
               color: AppTheme.textSecondary,
               fontSize: 18,
@@ -480,7 +541,7 @@ class _WelcomeArea extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            'Clique em um item da lista para ver detalhes\ne executar operações Git.',
+            AppLocalizations.of(context)!.selectRepoHint,
             textAlign: TextAlign.center,
             style: TextStyle(
               color: AppTheme.textMuted.withValues(alpha: 0.6),
@@ -507,9 +568,9 @@ class _ProjectCard extends StatelessWidget {
     required this.onDelete,
   });
 
-  StatusBadge _buildBadge() {
-    if (!project.isAvailable) return StatusBadge.error('OFF');
-    if (project.statusSummary == 'Limpo') return StatusBadge.ok();
+  StatusBadge _buildBadge(BuildContext context) {
+    if (!project.isAvailable) return StatusBadge.error(AppLocalizations.of(context)!.unavailable);
+    if (project.statusSummary == AppLocalizations.of(context)!.ok) return StatusBadge.ok();
     if (project.statusSummary.contains('alteração')) {
       return StatusBadge.warn(project.statusSummary);
     }
@@ -575,7 +636,7 @@ class _ProjectCard extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 10),
-            _buildBadge(),
+            _buildBadge(context),
             const SizedBox(width: 4),
             PopupMenuButton<String>(
               icon: const Icon(Icons.more_vert, color: AppTheme.textMuted, size: 18),

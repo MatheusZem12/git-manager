@@ -65,6 +65,7 @@ public class RestServer {
         app.get("/api/git/stashes", this::getStashes);
         app.get("/api/git/reflog", this::getReflog);
         app.get("/api/git/file-content", this::getFileContent);
+        app.get("/api/git/file-content-head", this::getFileContentHead);
         app.get("/api/git/file-diff", this::getFileDiff);
 
         app.post("/api/git/commit", this::doCommit);
@@ -217,6 +218,17 @@ public class RestServer {
             return;
         }
         ctx.result(gitService.getFileContent(path, file));
+    }
+
+    private void getFileContentHead(Context ctx) {
+        String path = requirePath(ctx);
+        String file = ctx.queryParam("file");
+        if (path == null) return;
+        if (file == null || file.isBlank()) {
+            ctx.status(HttpStatus.BAD_REQUEST).json(Map.of("error", "file query param is required"));
+            return;
+        }
+        ctx.result(gitService.getFileContentHead(path, file));
     }
 
     private void getFileDiff(Context ctx) {

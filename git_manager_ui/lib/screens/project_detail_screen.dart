@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import '../models/git_project.dart';
 import '../services/api_service.dart';
 import '../theme.dart';
@@ -68,7 +69,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
       });
     } catch (e) {
       setState(() => _loading = false);
-      _log('Erro ao carregar dados: $e');
+      _log('${AppLocalizations.of(context)!.errorLoadingData}: $e');
     }
   }
 
@@ -97,7 +98,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
       builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.bgElevated,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text('Credenciais — $operation', style: const TextStyle(color: AppTheme.text)),
+        title: Text('${AppLocalizations.of(context)!.credentials} — $operation', style: const TextStyle(color: AppTheme.text)),
         content: ConstrainedBox(
           constraints: const BoxConstraints(minWidth: 360),
           child: Column(
@@ -106,20 +107,20 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
               TextField(
                 controller: userCtrl,
                 style: const TextStyle(color: AppTheme.text),
-                decoration: const InputDecoration(labelText: 'Usuário (opcional)'),
+                decoration: InputDecoration(labelText: AppLocalizations.of(context)!.userOptional),
               ),
               const SizedBox(height: 12),
               TextField(
                 controller: passCtrl,
                 obscureText: true,
                 style: const TextStyle(color: AppTheme.text),
-                decoration: const InputDecoration(labelText: 'Senha/Token (opcional)'),
+                decoration: InputDecoration(labelText: AppLocalizations.of(context)!.passwordOptional),
               ),
             ],
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(AppLocalizations.of(context)!.cancel)),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
@@ -137,7 +138,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
                   break;
               }
             },
-            child: const Text('Executar'),
+            child: Text(AppLocalizations.of(context)!.execute),
           ),
         ],
       ),
@@ -162,13 +163,13 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
           },
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
+          TextButton(onPressed: () => Navigator.pop(ctx), child: Text(AppLocalizations.of(context)!.cancel)),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(ctx);
               if (ctrl.text.isNotEmpty) onConfirm(ctrl.text.trim());
             },
-            child: const Text('Confirmar'),
+            child: Text(AppLocalizations.of(context)!.confirm),
           ),
         ],
       ),
@@ -213,7 +214,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
                 IconButton(
                   icon: const Icon(Icons.refresh, color: AppTheme.textMuted, size: 20),
                   onPressed: _loadData,
-                  tooltip: 'Atualizar',
+                  tooltip: AppLocalizations.of(context)!.refresh,
                 ),
               ],
             ),
@@ -222,12 +223,12 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
           controller: _tabCtrl,
           isScrollable: true,
           tabAlignment: TabAlignment.start,
-          tabs: const [
-            Tab(icon: Icon(Icons.code, size: 20), text: 'Visão Geral'),
-            Tab(icon: Icon(Icons.edit_note, size: 20), text: 'Commit'),
-            Tab(icon: Icon(Icons.history, size: 20), text: 'Histórico'),
-            Tab(icon: Icon(Icons.label_outline, size: 20), text: 'Tags'),
-            Tab(icon: Icon(Icons.archive_outlined, size: 20), text: 'Stash'),
+          tabs: [
+            Tab(icon: const Icon(Icons.code, size: 20), text: AppLocalizations.of(context)!.overview),
+            Tab(icon: const Icon(Icons.edit_note, size: 20), text: AppLocalizations.of(context)!.commit),
+            Tab(icon: const Icon(Icons.history, size: 20), text: AppLocalizations.of(context)!.history),
+            Tab(icon: const Icon(Icons.label_outline, size: 20), text: AppLocalizations.of(context)!.tags),
+            Tab(icon: const Icon(Icons.archive_outlined, size: 20), text: AppLocalizations.of(context)!.stash),
           ],
         ),
         Expanded(
@@ -273,19 +274,19 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
           controller: _tabCtrl,
           isScrollable: true,
           tabAlignment: TabAlignment.start,
-          tabs: const [
-            Tab(icon: Icon(Icons.code, size: 20), text: 'Visão Geral'),
-            Tab(icon: Icon(Icons.edit_note, size: 20), text: 'Commit'),
-            Tab(icon: Icon(Icons.history, size: 20), text: 'Histórico'),
-            Tab(icon: Icon(Icons.label_outline, size: 20), text: 'Tags'),
-            Tab(icon: Icon(Icons.archive_outlined, size: 20), text: 'Stash'),
+          tabs: [
+            Tab(icon: const Icon(Icons.code, size: 20), text: AppLocalizations.of(context)!.overview),
+            Tab(icon: const Icon(Icons.edit_note, size: 20), text: AppLocalizations.of(context)!.commit),
+            Tab(icon: const Icon(Icons.history, size: 20), text: AppLocalizations.of(context)!.history),
+            Tab(icon: const Icon(Icons.label_outline, size: 20), text: AppLocalizations.of(context)!.tags),
+            Tab(icon: const Icon(Icons.archive_outlined, size: 20), text: AppLocalizations.of(context)!.stash),
           ],
         ),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadData,
-            tooltip: 'Atualizar',
+            tooltip: AppLocalizations.of(context)!.refresh,
           ),
         ],
       ),
@@ -311,57 +312,77 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             // Info header
-            ModernCard(
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _sectionTitle(Icons.account_tree_outlined, 'Branch Atual'),
-                        const SizedBox(height: 8),
-                        Text(
-                          _currentBranch ?? 'N/A',
-                          style: const TextStyle(
-                            color: AppTheme.text,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    width: 1,
-                    height: 50,
-                    color: AppTheme.borderStrong,
-                  ),
-                  const SizedBox(width: 20),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _sectionTitle(Icons.commit, 'HEAD'),
-                        const SizedBox(height: 8),
-                        FutureBuilder(
-                          future: widget.api.getStatus(widget.project.path),
-                          builder: (context, snapshot) {
-                            final head = snapshot.data?['head'] ?? '';
-                            return Text(
-                              head.isNotEmpty ? head.substring(0, 7) : '---',
-                              style: const TextStyle(
-                                color: AppTheme.text,
-                                fontSize: 16,
-                                fontFamily: 'monospace',
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final isNarrow = constraints.maxWidth < 500;
+                return ModernCard(
+                  child: isNarrow
+                      ? Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _sectionTitle(Icons.account_tree_outlined, AppLocalizations.of(context)!.currentBranch),
+                            const SizedBox(height: 8),
+                            Text(
+                              _currentBranch ?? AppLocalizations.of(context)!.unavailable,
+                              style: const TextStyle(color: AppTheme.text, fontSize: 18, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 16),
+                            const Divider(height: 1),
+                            const SizedBox(height: 16),
+                            _sectionTitle(Icons.commit, AppLocalizations.of(context)!.head),
+                            const SizedBox(height: 8),
+                            FutureBuilder(
+                              future: widget.api.getStatus(widget.project.path),
+                              builder: (context, snapshot) {
+                                final head = snapshot.data?['head'] ?? '';
+                                return Text(
+                                  head.isNotEmpty ? head.substring(0, 7) : '---',
+                                  style: const TextStyle(color: AppTheme.text, fontSize: 16, fontFamily: 'monospace'),
+                                );
+                              },
+                            ),
+                          ],
+                        )
+                      : Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _sectionTitle(Icons.account_tree_outlined, AppLocalizations.of(context)!.currentBranch),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    _currentBranch ?? AppLocalizations.of(context)!.unavailable,
+                                    style: const TextStyle(color: AppTheme.text, fontSize: 18, fontWeight: FontWeight.bold),
+                                  ),
+                                ],
                               ),
-                            );
-                          },
+                            ),
+                            Container(width: 1, height: 50, color: AppTheme.borderStrong),
+                            const SizedBox(width: 20),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _sectionTitle(Icons.commit, AppLocalizations.of(context)!.head),
+                                  const SizedBox(height: 8),
+                                  FutureBuilder(
+                                    future: widget.api.getStatus(widget.project.path),
+                                    builder: (context, snapshot) {
+                                      final head = snapshot.data?['head'] ?? '';
+                                      return Text(
+                                        head.isNotEmpty ? head.substring(0, 7) : '---',
+                                        style: const TextStyle(color: AppTheme.text, fontSize: 16, fontFamily: 'monospace'),
+                                      );
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+                );
+              },
             ),
             const SizedBox(height: 18),
             // Branch control
@@ -369,7 +390,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _sectionTitle(Icons.swap_horiz, 'Trocar Branch'),
+                  _sectionTitle(Icons.swap_horiz, AppLocalizations.of(context)!.switchBranch),
                   const SizedBox(height: 16),
                   LayoutBuilder(
                     builder: (context, constraints) {
@@ -385,8 +406,8 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
                               value: _currentBranch,
                               dropdownColor: AppTheme.bgElevated,
                               style: const TextStyle(color: AppTheme.text),
-                              decoration: const InputDecoration(
-                                labelText: 'Selecionar branch',
+                              decoration: InputDecoration(
+                                labelText: AppLocalizations.of(context)!.selectBranch,
                                 contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                               ),
                               items: _branches.map((b) {
@@ -400,7 +421,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
                           ),
                           _actionButton(
                             icon: Icons.check_circle_outline,
-                            label: 'Checkout',
+                            label: AppLocalizations.of(context)!.checkout,
                             color: AppTheme.accent,
                             onPressed: () {
                               if (_currentBranch != null) {
@@ -412,7 +433,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
                             icon: Icons.add,
                             label: 'Nova',
                             color: AppTheme.success,
-                            onPressed: () => _showInputDialog('Nova Branch', 'Nome da branch', (name) {
+                            onPressed: () => _showInputDialog(AppLocalizations.of(context)!.newBranch, AppLocalizations.of(context)!.branchName, (name) {
                               _runAsync(() => widget.api.createBranch(widget.project.path, name));
                             }),
                           ),
@@ -429,7 +450,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _sectionTitle(Icons.sync_outlined, 'Sincronização'),
+                  _sectionTitle(Icons.sync_outlined, AppLocalizations.of(context)!.sync),
                   const SizedBox(height: 16),
                   Wrap(
                     spacing: 12,
@@ -466,11 +487,11 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
                 children: [
                   Row(
                     children: [
-                      _sectionTitle(Icons.terminal, 'Saída'),
+                      _sectionTitle(Icons.terminal, AppLocalizations.of(context)!.output),
                       const Spacer(),
                       TextButton(
                         onPressed: () => _outputCtrl.clear(),
-                        child: const Text('Limpar'),
+                        child: Text(AppLocalizations.of(context)!.clear),
                       ),
                     ],
                   ),
@@ -531,13 +552,13 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _sectionTitle(Icons.history, 'Commits Recentes'),
+                _sectionTitle(Icons.history, AppLocalizations.of(context)!.recentCommits),
                 const SizedBox(height: 12),
                 SizedBox(
                   height: 240,
                   child: _commits.isEmpty
-                      ? const Center(
-                          child: Text('Nenhum commit', style: TextStyle(color: AppTheme.textMuted)),
+                      ? Center(
+                          child: Text(AppLocalizations.of(context)!.noCommits, style: const TextStyle(color: AppTheme.textMuted)),
                         )
                       : ListView.separated(
                           padding: const EdgeInsets.symmetric(vertical: 4),
@@ -576,7 +597,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _sectionTitle(Icons.account_tree, 'Timeline Gráfica'),
+                _sectionTitle(Icons.account_tree, AppLocalizations.of(context)!.graphicTimeline),
                 const SizedBox(height: 12),
                 Flexible(
                   fit: FlexFit.loose,
@@ -601,10 +622,10 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
         children: [
           _actionButton(
             icon: Icons.add,
-            label: 'Nova Tag',
+            label: AppLocalizations.of(context)!.newTag,
             color: AppTheme.accent,
-            onPressed: () => _showInputDialog('Nova Tag', 'Nome da tag', (name) {
-              _showInputDialog('Mensagem da Tag', 'Mensagem (opcional)', (msg) {
+            onPressed: () => _showInputDialog(AppLocalizations.of(context)!.newTag, AppLocalizations.of(context)!.tagName, (name) {
+              _showInputDialog(AppLocalizations.of(context)!.tagMessage, 'Mensagem (opcional)', (msg) {
                 _runAsync(() => widget.api.createTag(widget.project.path, name, msg));
               });
             }),
@@ -612,7 +633,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
           const SizedBox(height: 16),
           Expanded(
             child: _tags.isEmpty
-                ? const Center(child: Text('Nenhuma tag', style: TextStyle(color: AppTheme.textMuted)))
+                ? Center(child: Text(AppLocalizations.of(context)!.noTags, style: const TextStyle(color: AppTheme.textMuted)))
                 : ListView.builder(
                     itemCount: _tags.length,
                     itemBuilder: (_, i) {
@@ -649,21 +670,21 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
             children: [
               _actionButton(
                 icon: Icons.add,
-                label: 'Salvar Stash',
+                label: AppLocalizations.of(context)!.saveStash,
                 color: AppTheme.accent,
-                onPressed: () => _showInputDialog('Salvar Stash', 'Mensagem (opcional)', (msg) {
+                onPressed: () => _showInputDialog(AppLocalizations.of(context)!.saveStash, 'Mensagem (opcional)', (msg) {
                   _runAsync(() => widget.api.stashSave(widget.project.path, msg));
                 }),
               ),
               _actionButton(
                 icon: Icons.download_outlined,
-                label: 'Aplicar',
+                label: AppLocalizations.of(context)!.apply,
                 color: AppTheme.info,
                 onPressed: () => _runAsync(() => widget.api.stashApply(widget.project.path, 0)),
               ),
               _actionButton(
                 icon: Icons.archive_outlined,
-                label: 'Pop',
+                label: AppLocalizations.of(context)!.pop,
                 color: AppTheme.success,
                 onPressed: () => _runAsync(() => widget.api.stashPop(widget.project.path, 0)),
               ),
@@ -672,7 +693,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
           const SizedBox(height: 16),
           Expanded(
             child: _stashes.isEmpty
-                ? const Center(child: Text('Nenhum stash', style: TextStyle(color: AppTheme.textMuted)))
+                ? Center(child: Text(AppLocalizations.of(context)!.noStash, style: const TextStyle(color: AppTheme.textMuted)))
                 : ListView.builder(
                     itemCount: _stashes.length,
                     itemBuilder: (_, i) {

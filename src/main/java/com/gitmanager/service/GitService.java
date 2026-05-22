@@ -633,6 +633,22 @@ public class GitService {
         }
     }
 
+    public String getFileContentHead(String repoPath, String filePath) {
+        try (Git git = openGit(repoPath)) {
+            if (git == null) return "(repositório inacessível)";
+            Repository repo = git.getRepository();
+            ObjectId headId = repo.resolve("HEAD:" + filePath);
+            if (headId == null) return "";
+            try (ObjectReader reader = repo.newObjectReader()) {
+                byte[] bytes = reader.open(headId).getBytes();
+                return new String(bytes, StandardCharsets.UTF_8);
+            }
+        } catch (Exception e) {
+            log.debug("Erro ao ler HEAD de '{}': {}", filePath, e.getMessage());
+            return "";
+        }
+    }
+
     public String getFileDiff(String repoPath, String filePath, boolean staged) {
         // First try JGit diff command
         String jgitResult = diffViaJGit(repoPath, filePath, staged);
