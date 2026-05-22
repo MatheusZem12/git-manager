@@ -20,6 +20,17 @@ class ApiService {
     throw HttpException('${response.statusCode}: $body');
   }
 
+  Future<String> _getText(String path, {Map<String, String>? query}) async {
+    final uri = Uri.parse(baseUrl + path).replace(queryParameters: query);
+    final request = await _client.getUrl(uri);
+    final response = await request.close();
+    final body = await response.transform(utf8.decoder).join();
+    if (response.statusCode >= 200 && response.statusCode < 300) {
+      return body;
+    }
+    throw HttpException('${response.statusCode}: $body');
+  }
+
   Future<dynamic> _post(String path, Map<String, dynamic> body) async {
     final uri = Uri.parse(baseUrl + path);
     final request = await _client.postUrl(uri);
@@ -115,13 +126,15 @@ class ApiService {
   }
 
   Future<String> getFileContent(String path, String file) async {
-    final data = await _get('/git/file-content', query: {'path': path, 'file': file});
-    return data.toString();
+    return await _getText('/git/file-content', query: {'path': path, 'file': file});
+  }
+
+  Future<String> getFileContentHead(String path, String file) async {
+    return await _getText('/git/file-content-head', query: {'path': path, 'file': file});
   }
 
   Future<String> getFileDiff(String path, String file, {bool staged = false}) async {
-    final data = await _get('/git/file-diff', query: {'path': path, 'file': file, 'staged': staged.toString()});
-    return data.toString();
+    return await _getText('/git/file-diff', query: {'path': path, 'file': file, 'staged': staged.toString()});
   }
 
   // Git Actions

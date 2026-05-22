@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import '../models/git_commit.dart';
 import '../services/api_service.dart';
 import '../theme.dart';
@@ -75,9 +76,9 @@ class _TimelineScreenState extends State<TimelineScreen>
       );
     }
     if (_commits.isEmpty) {
-      return const Center(
-        child: Text('Nenhum commit para exibir',
-            style: TextStyle(color: AppTheme.textMuted)),
+      return Center(
+        child: Text(AppLocalizations.of(context)!.noCommitToShow,
+            style: const TextStyle(color: AppTheme.textMuted)),
       );
     }
 
@@ -106,14 +107,14 @@ class _RetryButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: AppTheme.borderStrong),
           ),
-          child: const Row(
+          child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(Icons.refresh, size: 16, color: AppTheme.textSecondary),
-              SizedBox(width: 8),
+              const Icon(Icons.refresh, size: 16, color: AppTheme.textSecondary),
+              const SizedBox(width: 8),
               Text(
-                'Tentar novamente',
-                style: TextStyle(
+                AppLocalizations.of(context)!.retry,
+                style: const TextStyle(
                   color: AppTheme.textSecondary,
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
@@ -137,44 +138,48 @@ class _GraphView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final painter = _TimelinePainter(commits);
-    final size = painter.calculateSize();
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final painter = _TimelinePainter(commits, availableSize: constraints.biggest);
+        final size = painter.calculateSize();
 
-    return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            AppTheme.bg.withValues(alpha: 0.95),
-            AppTheme.bgElevated.withValues(alpha: 0.3),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.borderStrong.withValues(alpha: 0.3)),
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: InteractiveViewer(
-        boundaryMargin: const EdgeInsets.all(200),
-        minScale: 0.1,
-        maxScale: 5.0,
-        constrained: false,
-        child: Container(
-          alignment: Alignment.center,
-          constraints: BoxConstraints(
-            minWidth: size.width,
-            minHeight: size.height,
+        return Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                AppTheme.bg.withValues(alpha: 0.95),
+                AppTheme.bgElevated.withValues(alpha: 0.3),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppTheme.borderStrong.withValues(alpha: 0.3)),
           ),
-          child: SizedBox(
-            width: size.width,
-            height: size.height,
-            child: CustomPaint(
-              size: size,
-              painter: painter,
+          clipBehavior: Clip.antiAlias,
+          child: InteractiveViewer(
+            boundaryMargin: const EdgeInsets.all(200),
+            minScale: 0.1,
+            maxScale: 5.0,
+            constrained: false,
+            child: Container(
+              alignment: Alignment.center,
+              constraints: BoxConstraints(
+                minWidth: size.width,
+                minHeight: size.height,
+              ),
+              child: SizedBox(
+                width: size.width,
+                height: size.height,
+                child: CustomPaint(
+                  size: size,
+                  painter: painter,
+                ),
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
@@ -201,7 +206,9 @@ class _TimelinePainter extends CustomPainter {
   late final int _maxLane;
   late final double _textX;
 
-  _TimelinePainter(this.commits) {
+  final Size availableSize;
+
+  _TimelinePainter(this.commits, {required this.availableSize}) {
     _assignLanesAndColors();
     _maxLane = _commitLanes.isEmpty
         ? 0
@@ -212,7 +219,10 @@ class _TimelinePainter extends CustomPainter {
   Size calculateSize() {
     final width = _leftMargin + (_maxLane + 2) * _laneWidth + _rightMargin;
     final height = _topMargin + commits.length * _rowHeight + _bottomMargin;
-    return Size(math.max(width, 900), math.max(height, 400));
+    return Size(
+      math.max(width, math.max(400, availableSize.width)),
+      math.max(height, math.max(200, availableSize.height)),
+    );
   }
 
   // ----------------------------------------------------------------
