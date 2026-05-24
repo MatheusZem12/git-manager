@@ -22,6 +22,7 @@ import org.eclipse.jgit.transport.CredentialItem;
 import org.eclipse.jgit.transport.CredentialsProvider;
 import org.eclipse.jgit.transport.FetchResult;
 import org.eclipse.jgit.transport.PushResult;
+import org.eclipse.jgit.transport.RemoteRefUpdate;
 import org.eclipse.jgit.transport.SshTransport;
 import org.eclipse.jgit.transport.Transport;
 import org.eclipse.jgit.transport.TransportConfigCallback;
@@ -551,13 +552,34 @@ public class GitService {
                 }
             }
             Iterable<PushResult> results = push.call();
-            StringBuilder sb = new StringBuilder();
+            List<String> updates = new ArrayList<>();
             for (PushResult result : results) {
-                sb.append(result.getMessages());
-                result.getRemoteUpdates().forEach(u -> sb.append(u.getStatus()).append(" "));
+                String messages = result.getMessages();
+                if (messages != null && !messages.isBlank()) {
+                    for (String line : messages.split("\\r?\\n")) {
+                        String trimmed = line.trim();
+                        if (trimmed.isEmpty()) continue;
+                        if (trimmed.contains("Enumerating objects") ||
+                            trimmed.contains("Counting objects") ||
+                            trimmed.contains("Compressing objects") ||
+                            trimmed.contains("Writing objects") ||
+                            trimmed.contains("Resolving deltas") ||
+                            trimmed.contains("Total")) {
+                            continue;
+                        }
+                        updates.add(trimmed);
+                    }
+                }
+                for (RemoteRefUpdate u : result.getRemoteUpdates()) {
+                    String ref = u.getRemoteName();
+                    String status = u.getStatus().name();
+                    updates.add(ref + " → " + status);
+                }
             }
-            String msg = sb.toString().trim();
-            return msg.isEmpty() ? "Push realizado com sucesso." : msg;
+            if (updates.isEmpty()) {
+                return "Push realizado com sucesso.";
+            }
+            return "Push realizado com sucesso.\\n" + String.join("\\n", updates);
         } catch (GitAPIException e) {
             log.error("Erro no push de '{}': {}", path, e.getMessage());
             return "Erro no push: " + e.getMessage();
