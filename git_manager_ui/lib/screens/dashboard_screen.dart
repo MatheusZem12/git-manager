@@ -4,13 +4,24 @@ import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import '../models/git_project.dart';
 import '../services/api_service.dart';
 import '../theme.dart';
+import '../utils/responsive.dart';
 import '../widgets/modern_card.dart';
 import '../widgets/status_badge.dart';
 import '../widgets/glass_container.dart';
+import '../widgets/modern_button.dart';
+import '../widgets/modern_dialog.dart';
+import '../widgets/language_selector.dart';
 import 'project_detail_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
-  const DashboardScreen({super.key});
+  final Locale locale;
+  final ValueChanged<Locale> onLocaleChange;
+
+  const DashboardScreen({
+    super.key,
+    required this.locale,
+    required this.onLocaleChange,
+  });
 
   @override
   State<DashboardScreen> createState() => _DashboardScreenState();
@@ -23,6 +34,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   bool _loading = true;
   String _search = '';
   GitProject? _selectedProject;
+
+  double _sidebarWidth = 300;
+  static const double _minSidebarWidth = 200;
+  static const double _maxSidebarWidth = 500;
+  bool _isDragging = false;
 
   @override
   void initState() {
@@ -71,13 +87,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
   void _showAddDialog() {
     final nameCtrl = TextEditingController();
     final pathCtrl = TextEditingController();
+    final l10n = AppLocalizations.of(context)!;
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: AppTheme.bgElevated,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
-          AppLocalizations.of(context)!.addRepo,
+          l10n.addRepo,
           style: const TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold),
         ),
         content: ConstrainedBox(
@@ -88,9 +105,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
               TextField(
                 controller: nameCtrl,
                 style: const TextStyle(color: AppTheme.text),
-                decoration: const InputDecoration(
-                  labelText: 'Nome do projeto',
-                  prefixIcon: Icon(Icons.folder_outlined),
+                decoration: InputDecoration(
+                  labelText: l10n.projectName,
+                  prefixIcon: const Icon(Icons.folder_outlined),
                 ),
               ),
               const SizedBox(height: 16),
@@ -101,21 +118,21 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       controller: pathCtrl,
                       style: const TextStyle(color: AppTheme.text),
                       decoration: InputDecoration(
-                        labelText: AppLocalizations.of(context)!.projectPath,
+                        labelText: l10n.projectPath,
                         prefixIcon: const Icon(Icons.folder_open_outlined),
                       ),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  OutlinedButton.icon(
+                  ModernButton(
+                    icon: Icons.folder_copy_outlined,
+                    label: l10n.browse,
+                    variant: ModernButtonVariant.ghost,
+                    compact: true,
                     onPressed: () async {
                       final dir = await getDirectoryPath();
-                      if (dir != null) {
-                        pathCtrl.text = dir;
-                      }
+                      if (dir != null) pathCtrl.text = dir;
                     },
-                    icon: const Icon(Icons.folder_copy_outlined, size: 18),
-                    label: Text(AppLocalizations.of(context)!.browse),
                   ),
                 ],
               ),
@@ -123,11 +140,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
         ),
         actions: [
-          TextButton(
+          ModernButton(
+            label: l10n.cancel,
+            variant: ModernButtonVariant.ghost,
+            compact: true,
             onPressed: () => Navigator.pop(ctx),
-            child: Text(AppLocalizations.of(context)!.cancel),
           ),
-          ElevatedButton(
+          ModernButton(
+            label: l10n.add,
             onPressed: () async {
               if (nameCtrl.text.isEmpty || pathCtrl.text.isEmpty) return;
               Navigator.pop(ctx);
@@ -138,7 +158,6 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 _showError(e.toString());
               }
             },
-            child: Text(AppLocalizations.of(context)!.add),
           ),
         ],
       ),
@@ -146,37 +165,23 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   void _confirmDelete(GitProject project) {
+    final l10n = AppLocalizations.of(context)!;
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppTheme.bgElevated,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(
-          AppLocalizations.of(context)!.removeRepo,
-          style: const TextStyle(color: AppTheme.text, fontWeight: FontWeight.bold),
-        ),
-        content: Text(
-          'Remover "${project.name}" da lista?\n\n${AppLocalizations.of(context)!.removeRepoConfirm}',
-          style: const TextStyle(color: AppTheme.textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(AppLocalizations.of(context)!.cancel),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.danger),
-            onPressed: () async {
-              Navigator.pop(ctx);
-              await _api.deleteProject(project.path);
-              if (_selectedProject?.path == project.path) {
-                setState(() => _selectedProject = null);
-              }
-              await _loadProjects();
-            },
-            child: Text(AppLocalizations.of(context)!.remove),
-          ),
-        ],
+      builder: (ctx) => ModernConfirmDialog(
+        title: l10n.deleteRepoTitle,
+        message: l10n.deleteRepoMessage(project.name),
+        icon: Icons.folder_delete_outlined,
+        confirmLabel: l10n.remove,
+        cancelLabel: l10n.cancel,
+        confirmVariant: ModernButtonVariant.danger,
+        onConfirm: () async {
+          await _api.deleteProject(project.path);
+          if (_selectedProject?.path == project.path) {
+            setState(() => _selectedProject = null);
+          }
+          await _loadProjects();
+        },
       ),
     );
   }
@@ -185,20 +190,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final available = _projects.where((p) => p.isAvailable).length;
-    final withChanges = _projects.where((p) => p.isAvailable && p.statusSummary != l10n.ok).length;
     final unavailable = _projects.length - available;
 
     return LayoutBuilder(
       builder: (context, constraints) {
         final width = constraints.maxWidth;
         final isCompact = width < 600;
-        final isMedium = width >= 600 && width < 1100;
-        final isWide = width >= 1100;
 
         Widget sidebarContent = _buildSidebarContent(
           l10n: l10n,
           available: available,
-          withChanges: withChanges,
           unavailable: unavailable,
           compact: isCompact,
         );
@@ -214,73 +215,80 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
         );
 
-        if (isWide) {
+        if (isCompact) {
           return Scaffold(
             backgroundColor: AppTheme.bg,
-            body: Row(
-              children: [
-                SizedBox(width: 340, child: sidebarContent),
-                Expanded(child: body),
-              ],
-            ),
-          );
-        }
-
-        if (isMedium) {
-          return Scaffold(
-            backgroundColor: AppTheme.bg,
-            body: Row(
-              children: [
-                NavigationRail(
-                  backgroundColor: AppTheme.bgElevated,
-                  selectedIndex: 0,
-                  labelType: NavigationRailLabelType.selected,
-                  destinations: [
-                    NavigationRailDestination(
-                      icon: const Icon(Icons.folder_copy_outlined, color: AppTheme.textMuted),
-                      selectedIcon: const Icon(Icons.folder_copy_outlined, color: AppTheme.accent),
-                      label: Text(l10n.appTitle, style: const TextStyle(fontSize: 10)),
-                    ),
-                  ],
-                  trailing: IconButton(
-                    icon: const Icon(Icons.add, color: AppTheme.text),
-                    onPressed: _showAddDialog,
-                    tooltip: l10n.addRepo,
-                  ),
+            appBar: AppBar(
+              backgroundColor: AppTheme.bgElevated,
+              elevation: 0,
+              title: Text(l10n.appTitle),
+              actions: [
+                LanguageSelector(
+                  currentLocale: widget.locale,
+                  onChanged: widget.onLocaleChange,
                 ),
-                Expanded(
-                  child: Row(
-                    children: [
-                      SizedBox(width: 280, child: sidebarContent),
-                      Expanded(child: body),
-                    ],
-                  ),
+                const SizedBox(width: 8),
+                IconButton(
+                  icon: const Icon(Icons.refresh, color: AppTheme.textMuted),
+                  onPressed: _loadProjects,
+                  tooltip: l10n.refresh,
                 ),
               ],
             ),
+            drawer: Drawer(
+              backgroundColor: AppTheme.bgElevated,
+              child: sidebarContent,
+            ),
+            body: body,
           );
         }
 
-        // Compact: drawer + body
         return Scaffold(
           backgroundColor: AppTheme.bg,
-          appBar: AppBar(
-            backgroundColor: AppTheme.bgElevated,
-            elevation: 0,
-            title: Text(l10n.appTitle),
-            actions: [
-              IconButton(
-                icon: const Icon(Icons.refresh, color: AppTheme.textMuted),
-                onPressed: _loadProjects,
-                tooltip: l10n.refresh,
+          body: Row(
+            children: [
+              SizedBox(
+                width: _sidebarWidth,
+                child: sidebarContent,
               ),
+              MouseRegion(
+                cursor: SystemMouseCursors.resizeLeftRight,
+                child: Listener(
+                  onPointerDown: (_) => setState(() => _isDragging = true),
+                  onPointerUp: (_) => setState(() => _isDragging = false),
+                  onPointerCancel: (_) => setState(() => _isDragging = false),
+                  onPointerMove: (event) {
+                    if (event.buttons == 1) {
+                      setState(() {
+                        _sidebarWidth += event.delta.dx;
+                        _sidebarWidth = _sidebarWidth.clamp(_minSidebarWidth, _maxSidebarWidth);
+                      });
+                    }
+                  },
+                  child: Container(
+                    width: 10,
+                    color: _isDragging
+                        ? AppTheme.accent.withValues(alpha: 0.25)
+                        : Colors.transparent,
+                    child: Center(
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 150),
+                        width: 3,
+                        height: _isDragging ? 60 : 36,
+                        decoration: BoxDecoration(
+                          color: _isDragging
+                              ? AppTheme.accent
+                              : AppTheme.borderStrong.withValues(alpha: 0.35),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Expanded(child: body),
             ],
           ),
-          drawer: Drawer(
-            backgroundColor: AppTheme.bgElevated,
-            child: sidebarContent,
-          ),
-          body: body,
         );
       },
     );
@@ -289,10 +297,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _buildSidebarContent({
     required AppLocalizations l10n,
     required int available,
-    required int withChanges,
     required int unavailable,
     required bool compact,
   }) {
+    final s = Responsive.sidebarScale(_sidebarWidth);
+
     return Container(
       decoration: BoxDecoration(
         color: AppTheme.bgElevated,
@@ -304,7 +313,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         children: [
           if (!compact)
             GlassContainer(
-              padding: const EdgeInsets.all(20),
+              padding: EdgeInsets.all(Responsive.pad(16, s)),
               borderRadius: const BorderRadius.vertical(bottom: Radius.circular(20)),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -312,30 +321,55 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(10),
+                        padding: EdgeInsets.all(Responsive.pad(8, s)),
                         decoration: BoxDecoration(
-                          color: AppTheme.accent.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(12),
+                          gradient: LinearGradient(
+                            colors: [
+                              AppTheme.accent.withValues(alpha: 0.3),
+                              AppTheme.accentHover.withValues(alpha: 0.15),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                        child: const Icon(Icons.folder_copy_outlined, color: AppTheme.accent, size: 24),
+                        child: Icon(
+                          Icons.folder_copy_outlined,
+                          color: AppTheme.accent,
+                          size: Responsive.icon(22, s),
+                        ),
                       ),
-                      const SizedBox(width: 12),
+                      SizedBox(width: Responsive.pad(10, s)),
                       Expanded(
                         child: Text(
                           l10n.appTitle,
-                          style: const TextStyle(
-                            color: AppTheme.text, fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: -0.5,
+                          style: TextStyle(
+                            color: AppTheme.text,
+                            fontSize: Responsive.font(20, s),
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: -0.5,
                           ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
                         ),
                       ),
+                      LanguageSelector(
+                        currentLocale: widget.locale,
+                        onChanged: widget.onLocaleChange,
+                      ),
+                      SizedBox(width: Responsive.pad(6, s)),
                       IconButton(
-                        icon: const Icon(Icons.refresh, color: AppTheme.textMuted, size: 20),
+                        icon: Icon(
+                          Icons.refresh,
+                          color: AppTheme.textMuted,
+                          size: Responsive.icon(18, s),
+                        ),
                         onPressed: _loadProjects,
                         tooltip: l10n.refresh,
                       ),
                     ],
                   ),
-                  const SizedBox(height: 20),
+                  SizedBox(height: Responsive.pad(12, s)),
                   TextField(
                     onChanged: (v) {
                       setState(() {
@@ -343,13 +377,24 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         _applyFilter();
                       });
                     },
-                    style: const TextStyle(color: AppTheme.text),
+                    style: TextStyle(
+                      color: AppTheme.text,
+                      fontSize: Responsive.font(13, s),
+                    ),
                     decoration: InputDecoration(
                       hintText: l10n.searchRepo,
-                      prefixIcon: const Icon(Icons.search, color: AppTheme.textMuted),
+                      prefixIcon: Icon(
+                        Icons.search,
+                        color: AppTheme.textMuted,
+                        size: Responsive.icon(18, s),
+                      ),
                       suffixIcon: _search.isNotEmpty
                           ? IconButton(
-                              icon: const Icon(Icons.clear, color: AppTheme.textMuted, size: 18),
+                              icon: Icon(
+                                Icons.clear,
+                                color: AppTheme.textMuted,
+                                size: Responsive.icon(16, s),
+                              ),
                               onPressed: () => setState(() { _search = ''; _applyFilter(); }),
                             )
                           : null,
@@ -360,18 +405,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           if (!compact)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              padding: EdgeInsets.symmetric(
+                horizontal: Responsive.pad(14, s),
+                vertical: Responsive.pad(10, s),
+              ),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _statItem(_projects.length.toString(), l10n.total, AppTheme.text),
-                  _statItem(available.toString(), l10n.ok, AppTheme.success),
-                  _statItem(withChanges.toString(), l10n.alt, AppTheme.warning),
-                  _statItem(
-                    unavailable.toString(),
-                    l10n.unavailable,
-                    unavailable > 0 ? AppTheme.danger : AppTheme.textMuted,
-                  ),
+                  _statItem(_projects.length.toString(), l10n.total, AppTheme.text, s),
+                  _statItem(available.toString(), l10n.ok, AppTheme.success, s),
+                  _statItem(unavailable.toString(), l10n.unavailable, unavailable > 0 ? AppTheme.danger : AppTheme.textMuted, s),
                 ],
               ),
             ),
@@ -383,7 +426,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     ? const _EmptyState()
                     : Scrollbar(
                         child: ListView.builder(
-                          padding: const EdgeInsets.all(12),
+                          padding: EdgeInsets.all(Responsive.pad(10, s)),
                           itemCount: _filtered.length,
                           itemBuilder: (context, index) {
                             final project = _filtered[index];
@@ -391,6 +434,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             return _ProjectCard(
                               project: project,
                               isSelected: isSelected,
+                              sidebarWidth: _sidebarWidth,
+                              scale: s,
                               onTap: () => setState(() => _selectedProject = project),
                               onDelete: () => _confirmDelete(project),
                             );
@@ -400,85 +445,47 @@ class _DashboardScreenState extends State<DashboardScreen> {
           ),
           Container(
             width: double.infinity,
-            padding: const EdgeInsets.all(16),
+            padding: EdgeInsets.all(Responsive.pad(12, s)),
             decoration: BoxDecoration(
               color: AppTheme.bgElevated,
               border: Border(top: BorderSide(color: AppTheme.borderStrong.withValues(alpha: 0.3))),
             ),
-            child: _AddRepoButton(onTap: _showAddDialog),
+            child: ModernButton(
+              icon: Icons.add_rounded,
+              label: l10n.addRepo,
+              onPressed: _showAddDialog,
+              compact: true,
+              scale: s,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _statItem(String value, String label, Color color) {
+  Widget _statItem(String value, String label, Color color, double scale) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
           value,
-          style: TextStyle(color: color, fontSize: 18, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: color,
+            fontSize: Responsive.font(16, scale),
+            fontWeight: FontWeight.bold,
+          ),
         ),
-        const SizedBox(height: 4),
+        SizedBox(height: Responsive.pad(2, scale)),
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             color: AppTheme.textMuted,
-            fontSize: 10,
+            fontSize: Responsive.font(9, scale),
             fontWeight: FontWeight.w600,
             letterSpacing: 0.5,
           ),
         ),
       ],
-    );
-  }
-}
-
-class _AddRepoButton extends StatelessWidget {
-  final VoidCallback onTap;
-
-  const _AddRepoButton({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 200),
-          curve: Curves.easeOut,
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          decoration: BoxDecoration(
-            color: AppTheme.surface,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppTheme.borderStrong.withValues(alpha: 0.4)),
-            boxShadow: [
-              BoxShadow(
-                color: AppTheme.bg.withValues(alpha: 0.5),
-                blurRadius: 8,
-                offset: const Offset(0, 2),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.add_rounded, color: AppTheme.text, size: 20),
-              const SizedBox(width: 8),
-              Text(
-                AppLocalizations.of(context)!.addRepo,
-                style: TextStyle(
-                  color: AppTheme.text,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
     );
   }
 }
@@ -492,16 +499,16 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.inbox_outlined, size: 48, color: AppTheme.textMuted.withValues(alpha: 0.5)),
-          const SizedBox(height: 16),
+          Icon(Icons.inbox_outlined, size: 44, color: AppTheme.textMuted.withValues(alpha: 0.5)),
+          const SizedBox(height: 12),
           Text(
             AppLocalizations.of(context)!.noRepo,
-            style: TextStyle(color: AppTheme.textMuted, fontSize: 15, fontWeight: FontWeight.w500),
+            style: const TextStyle(color: AppTheme.textMuted, fontSize: 14, fontWeight: FontWeight.w500),
           ),
           const SizedBox(height: 4),
           Text(
             AppLocalizations.of(context)!.noRepoHint,
-            style: TextStyle(color: AppTheme.textMuted.withValues(alpha: 0.6), fontSize: 12),
+            style: TextStyle(color: AppTheme.textMuted.withValues(alpha: 0.6), fontSize: 11),
           ),
         ],
       ),
@@ -519,33 +526,33 @@ class _WelcomeArea extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            padding: const EdgeInsets.all(24),
+            padding: const EdgeInsets.all(20),
             decoration: BoxDecoration(
-              color: AppTheme.surface.withValues(alpha: 0.5),
+              color: AppTheme.surface.withValues(alpha: 0.4),
               shape: BoxShape.circle,
             ),
             child: Icon(
               Icons.account_tree_outlined,
-              size: 64,
+              size: 56,
               color: AppTheme.textMuted.withValues(alpha: 0.3),
             ),
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 24),
           Text(
             AppLocalizations.of(context)!.selectRepo,
-            style: TextStyle(
+            style: const TextStyle(
               color: AppTheme.textSecondary,
-              fontSize: 18,
+              fontSize: 16,
               fontWeight: FontWeight.w500,
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           Text(
             AppLocalizations.of(context)!.selectRepoHint,
             textAlign: TextAlign.center,
             style: TextStyle(
               color: AppTheme.textMuted.withValues(alpha: 0.6),
-              fontSize: 13,
+              fontSize: 12,
               height: 1.5,
             ),
           ),
@@ -558,99 +565,92 @@ class _WelcomeArea extends StatelessWidget {
 class _ProjectCard extends StatelessWidget {
   final GitProject project;
   final bool isSelected;
+  final double sidebarWidth;
+  final double scale;
   final VoidCallback onTap;
   final VoidCallback onDelete;
 
   const _ProjectCard({
     required this.project,
     required this.isSelected,
+    required this.sidebarWidth,
+    required this.scale,
     required this.onTap,
     required this.onDelete,
   });
 
-  StatusBadge _buildBadge(BuildContext context) {
-    if (!project.isAvailable) return StatusBadge.error(AppLocalizations.of(context)!.unavailable);
-    if (project.statusSummary == AppLocalizations.of(context)!.ok) return StatusBadge.ok();
-    if (project.statusSummary.contains('alteração')) {
-      return StatusBadge.warn(project.statusSummary);
-    }
-    return StatusBadge.neutral(project.statusSummary);
-  }
-
-  Color _dotColor() {
-    if (!project.existsOnDisk) return AppTheme.danger;
-    if (!project.hasGit) return AppTheme.warning;
-    return AppTheme.success;
+  StatusBadge _buildBadge() {
+    if (!project.isAvailable) return StatusBadge.error(tooltip: 'Unavailable');
+    if (!project.existsOnDisk) return StatusBadge.error(tooltip: 'Not found');
+    if (!project.hasGit) return StatusBadge.warn(tooltip: 'No git');
+    return StatusBadge.ok();
   }
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: EdgeInsets.only(bottom: Responsive.pad(8, scale)),
       child: ModernCard(
         onTap: onTap,
         color: isSelected ? AppTheme.surfaceActive : null,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        padding: EdgeInsets.symmetric(
+          horizontal: Responsive.pad(12, scale),
+          vertical: Responsive.pad(10, scale),
+        ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Container(
-              width: 10,
-              height: 10,
-              decoration: BoxDecoration(
-                color: _dotColor(),
-                shape: BoxShape.circle,
-                boxShadow: [
-                  BoxShadow(
-                    color: _dotColor().withValues(alpha: 0.4),
-                    blurRadius: 8,
-                    spreadRadius: 2,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 14),
+            _buildBadge(),
+            SizedBox(width: Responsive.pad(10, scale)),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(
-                    project.name,
-                    style: TextStyle(
-                      color: AppTheme.text,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
+                  Tooltip(
+                    message: project.name,
+                    waitDuration: const Duration(milliseconds: 400),
+                    child: Text(
+                      project.name,
+                      style: TextStyle(
+                        color: AppTheme.text,
+                        fontSize: Responsive.font(13, scale),
+                        fontWeight: FontWeight.w600,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
                     ),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
                   ),
-                  const SizedBox(height: 4),
+                  SizedBox(height: Responsive.pad(2, scale)),
                   Text(
-                    '${project.currentBranch}   ·   ${project.statusSummary}',
-                    style: const TextStyle(color: AppTheme.textMuted, fontSize: 12),
+                    project.currentBranch,
+                    style: TextStyle(
+                      color: AppTheme.textMuted,
+                      fontSize: Responsive.font(11, scale),
+                    ),
                     overflow: TextOverflow.ellipsis,
                     maxLines: 1,
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 10),
-            _buildBadge(context),
-            const SizedBox(width: 4),
             PopupMenuButton<String>(
-              icon: const Icon(Icons.more_vert, color: AppTheme.textMuted, size: 18),
+              icon: Icon(
+                Icons.more_vert,
+                color: AppTheme.textMuted,
+                size: Responsive.icon(16, scale),
+              ),
               color: AppTheme.surface,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               itemBuilder: (context) => [
                 PopupMenuItem(
                   value: 'delete',
                   onTap: onDelete,
-                  child: const Row(
+                  child: Row(
                     children: [
-                      Icon(Icons.delete_outline, color: AppTheme.danger, size: 18),
-                      SizedBox(width: 8),
-                      Text('Remover', style: TextStyle(color: AppTheme.danger)),
+                      Icon(Icons.delete_outline, color: AppTheme.danger, size: Responsive.icon(16, scale)),
+                      SizedBox(width: Responsive.pad(8, scale)),
+                      Text(AppLocalizations.of(context)!.remove, style: const TextStyle(color: AppTheme.danger, fontSize: 13)),
                     ],
                   ),
                 ),

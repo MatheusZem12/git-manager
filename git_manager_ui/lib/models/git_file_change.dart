@@ -1,3 +1,5 @@
+import 'package:flutter_gen/gen_l10n/app_localizations.dart';
+
 class GitFileChange {
   final String path;
   final String? oldPath;
@@ -26,6 +28,24 @@ class GitFileChange {
         'type': type,
         'staged': staged,
       };
+
+  String labelText(AppLocalizations l10n) {
+    switch (type) {
+      case 'ADDED':
+        return l10n.added;
+      case 'MODIFIED':
+        return l10n.modified;
+      case 'DELETED':
+        return l10n.deleted;
+      case 'RENOMEADO':
+        return l10n.renamed;
+      case 'CONFLICTING':
+        return l10n.conflicting;
+      case 'UNTRACKED':
+      default:
+        return l10n.untracked;
+    }
+  }
 
   String get label {
     switch (type) {

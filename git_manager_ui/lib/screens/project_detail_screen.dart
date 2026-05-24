@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import '../models/git_project.dart';
 import '../services/api_service.dart';
 import '../theme.dart';
+import '../widgets/modern_button.dart';
 import '../widgets/modern_card.dart';
+import '../widgets/modern_dialog.dart';
 import 'staging_screen.dart';
 import 'timeline_screen.dart';
 
@@ -30,39 +34,81 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
   final _branchCtrl = TextEditingController();
   List<String> _branches = [];
   String? _currentBranch;
-  List<String> _commits = [];
   List<String> _tags = [];
   List<String> _stashes = [];
   bool _loading = true;
+  int _syncAhead = 0;
+  int _syncBehind = 0;
+  bool _hasRemote = false;
+  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
     _tabCtrl = TabController(length: 5, vsync: this);
     _loadData();
+    _refreshStatus();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      _refreshAll();
+    });
   }
 
   @override
   void dispose() {
+    _refreshTimer?.cancel();
     _tabCtrl.dispose();
     _outputCtrl.dispose();
     _branchCtrl.dispose();
     super.dispose();
   }
 
+  Future<void> _refreshStatus() async {
+    try {
+      final sync = await widget.api.getSyncStatus(widget.project.path);
+      if (mounted) {
+        setState(() {
+          _syncAhead = (sync['ahead'] as num?)?.toInt() ?? 0;
+          _syncBehind = (sync['behind'] as num?)?.toInt() ?? 0;
+          _hasRemote = sync['hasRemote'] == true;
+        });
+      }
+    } catch (e) {
+      // Silently fail on background refresh
+    }
+  }
+
+  Future<void> _refreshAll() async {
+    await _refreshStatus();
+    try {
+      final branches = await widget.api.getBranches(widget.project.path);
+      final tags = await widget.api.getTags(widget.project.path);
+      final stashes = await widget.api.getStashes(widget.project.path);
+      if (mounted) {
+        setState(() {
+          _branches = branches.map((b) => b.name).toList();
+          _currentBranch = branches.isEmpty
+              ? (widget.project.currentBranch.isNotEmpty ? widget.project.currentBranch : null)
+              : branches.firstWhere((b) => b.head, orElse: () => branches.first).name;
+          _tags = tags;
+          _stashes = stashes;
+        });
+      }
+    } catch (e) {
+      // Silently fail on background refresh
+    }
+  }
+
   Future<void> _loadData() async {
     setState(() => _loading = true);
     try {
       final branches = await widget.api.getBranches(widget.project.path);
-      final commits = await widget.api.getCommits(widget.project.path);
       final tags = await widget.api.getTags(widget.project.path);
       final stashes = await widget.api.getStashes(widget.project.path);
       setState(() {
         _branches = branches.map((b) => b.name).toList();
         _currentBranch = branches.isEmpty
-            ? null
+            ? (widget.project.currentBranch.isNotEmpty ? widget.project.currentBranch : null)
             : branches.firstWhere((b) => b.head, orElse: () => branches.first).name;
-        _commits = commits;
         _tags = tags;
         _stashes = stashes;
         _loading = false;
@@ -305,7 +351,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
 
   Widget _buildOverviewTab() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(16),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 900),
         child: Column(
@@ -384,31 +430,32 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
                 );
               },
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 12),
             // Branch control
             ModernCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _sectionTitle(Icons.swap_horiz, AppLocalizations.of(context)!.switchBranch),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 12),
                   LayoutBuilder(
                     builder: (context, constraints) {
                       final isWide = constraints.maxWidth > 500;
                       return Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
+                        spacing: 10,
+                        runSpacing: 10,
                         crossAxisAlignment: WrapCrossAlignment.center,
                         children: [
                           SizedBox(
-                            width: isWide ? 240 : double.infinity,
+                            width: isWide ? 220 : double.infinity,
                             child: DropdownButtonFormField<String>(
                               value: _currentBranch,
                               dropdownColor: AppTheme.bgElevated,
                               style: const TextStyle(color: AppTheme.text),
                               decoration: InputDecoration(
                                 labelText: AppLocalizations.of(context)!.selectBranch,
-                                contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                isDense: true,
                               ),
                               items: _branches.map((b) {
                                 return DropdownMenuItem(
@@ -419,20 +466,24 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
                               onChanged: (v) => setState(() => _currentBranch = v),
                             ),
                           ),
-                          _actionButton(
+                          ModernButton(
                             icon: Icons.check_circle_outline,
                             label: AppLocalizations.of(context)!.checkout,
-                            color: AppTheme.accent,
+                            variant: ModernButtonVariant.primary,
+                            compact: true,
+                            tooltip: AppLocalizations.of(context)!.infoTooltipCheckout,
                             onPressed: () {
                               if (_currentBranch != null) {
                                 _runAsync(() => widget.api.checkout(widget.project.path, _currentBranch!));
                               }
                             },
                           ),
-                          _actionButton(
+                          ModernButton(
                             icon: Icons.add,
-                            label: 'Nova',
-                            color: AppTheme.success,
+                            label: AppLocalizations.of(context)!.newBranch,
+                            variant: ModernButtonVariant.success,
+                            compact: true,
+                            tooltip: AppLocalizations.of(context)!.infoTooltipNewBranch,
                             onPressed: () => _showInputDialog(AppLocalizations.of(context)!.newBranch, AppLocalizations.of(context)!.branchName, (name) {
                               _runAsync(() => widget.api.createBranch(widget.project.path, name));
                             }),
@@ -444,42 +495,83 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
                 ],
               ),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 12),
             // Sync
             ModernCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _sectionTitle(Icons.sync_outlined, AppLocalizations.of(context)!.sync),
-                  const SizedBox(height: 16),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 12,
+                  Row(
                     children: [
-                      _actionButton(
+                      _sectionTitle(Icons.sync_outlined, AppLocalizations.of(context)!.sync),
+                      const Spacer(),
+                      if (_hasRemote) ...[
+                        if (_syncAhead == 0 && _syncBehind == 0)
+                          Text(
+                            AppLocalizations.of(context)!.upToDate,
+                            style: const TextStyle(color: AppTheme.success, fontSize: 11, fontWeight: FontWeight.w600),
+                          )
+                        else
+                          Text(
+                            '${_syncAhead > 0 ? '+$_syncAhead ' : ''}${_syncBehind > 0 ? '-$_syncBehind' : ''}',
+                            style: const TextStyle(color: AppTheme.warning, fontSize: 11, fontWeight: FontWeight.w600),
+                          ),
+                      ] else
+                        Text(
+                          AppLocalizations.of(context)!.noRemoteConfigured,
+                          style: const TextStyle(color: AppTheme.textMuted, fontSize: 11),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    alignment: WrapAlignment.start,
+                    children: [
+                      ModernButton(
                         icon: Icons.arrow_upward,
-                        label: 'Push',
-                        color: AppTheme.accent,
-                        onPressed: () => _showCredsDialog('Push'),
+                        label: AppLocalizations.of(context)!.push,
+                        variant: ModernButtonVariant.primary,
+                        compact: true,
+                        disabled: !_hasRemote || _syncAhead <= 0,
+                        tooltip: !_hasRemote
+                            ? AppLocalizations.of(context)!.noRemoteConfigured
+                            : _syncAhead <= 0
+                                ? AppLocalizations.of(context)!.nothingToPush
+                                : AppLocalizations.of(context)!.infoTooltipPush,
+                        onPressed: () => _runAsync(() => widget.api.push(widget.project.path)),
                       ),
-                      _actionButton(
+                      ModernButton(
                         icon: Icons.arrow_downward,
-                        label: 'Pull',
-                        color: AppTheme.success,
-                        onPressed: () => _showCredsDialog('Pull'),
+                        label: AppLocalizations.of(context)!.pull,
+                        variant: ModernButtonVariant.success,
+                        compact: true,
+                        disabled: !_hasRemote || _syncBehind <= 0,
+                        tooltip: !_hasRemote
+                            ? AppLocalizations.of(context)!.noRemoteConfigured
+                            : _syncBehind <= 0
+                                ? AppLocalizations.of(context)!.nothingToPull
+                                : AppLocalizations.of(context)!.infoTooltipPull,
+                        onPressed: () => _runAsync(() => widget.api.pull(widget.project.path)),
                       ),
-                      _actionButton(
+                      ModernButton(
                         icon: Icons.sync,
-                        label: 'Fetch',
-                        color: AppTheme.info,
-                        onPressed: () => _showCredsDialog('Fetch'),
+                        label: AppLocalizations.of(context)!.fetch,
+                        variant: ModernButtonVariant.info,
+                        compact: true,
+                        disabled: !_hasRemote,
+                        tooltip: !_hasRemote
+                            ? AppLocalizations.of(context)!.noRemoteConfigured
+                            : AppLocalizations.of(context)!.infoTooltipFetch,
+                        onPressed: () => _runAsync(() => widget.api.fetch(widget.project.path)),
                       ),
                     ],
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 12),
             // Output
             ModernCard(
               child: Column(
@@ -528,85 +620,96 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
 
   Widget _buildCommitTab() {
     return Padding(
-      padding: const EdgeInsets.all(24),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1200),
-        child: ModernCard(
-          child: StagingScreen(
-            path: widget.project.path,
-            api: widget.api,
-            onLog: _log,
-          ),
-        ),
+      padding: const EdgeInsets.all(8),
+      child: StagingScreen(
+        path: widget.project.path,
+        api: widget.api,
+        onLog: _log,
       ),
     );
   }
 
   Widget _buildHistoryTab() {
+    final l10n = AppLocalizations.of(context)!;
     return Padding(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(12),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Branch commits
           ModernCard(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _sectionTitle(Icons.history, AppLocalizations.of(context)!.recentCommits),
-                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    _sectionTitle(Icons.history, l10n.branchCommits),
+                    const Spacer(),
+                    if (_currentBranch != null)
+                      _BranchChip(name: _currentBranch!, color: AppTheme.accent),
+                  ],
+                ),
+                const SizedBox(height: 8),
                 SizedBox(
-                  height: 240,
-                  child: _commits.isEmpty
-                      ? Center(
-                          child: Text(AppLocalizations.of(context)!.noCommits, style: const TextStyle(color: AppTheme.textMuted)),
-                        )
-                      : ListView.separated(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          itemCount: _commits.length,
-                          separatorBuilder: (_, __) => const Divider(height: 1),
-                          itemBuilder: (_, i) {
-                            return ListTile(
-                              dense: true,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 12),
-                              leading: Container(
-                                width: 32,
-                                height: 32,
-                                decoration: BoxDecoration(
-                                  color: AppTheme.accent.withValues(alpha: 0.1),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(Icons.commit, size: 14, color: AppTheme.accent),
+                  height: 160,
+                  child: FutureBuilder(
+                    future: widget.api.getCommitGraph(widget.project.path),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) {
+                        return const Center(child: SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.accent)));
+                      }
+                      final allCommits = snapshot.data!;
+                      final branchCommits = _currentBranch == null
+                          ? allCommits
+                          : allCommits.where((c) => c.branchNames.any((b) => b.contains(_currentBranch!))).toList();
+                      if (branchCommits.isEmpty) {
+                        return Center(child: Text(l10n.noCommitsToShow, style: const TextStyle(color: AppTheme.textMuted, fontSize: 12)));
+                      }
+                      return ListView.separated(
+                        padding: EdgeInsets.zero,
+                        itemCount: branchCommits.length.clamp(0, 12),
+                        separatorBuilder: (_, __) => const Divider(height: 1),
+                        itemBuilder: (_, i) {
+                          final c = branchCommits[i];
+                          return ListTile(
+                            dense: true,
+                            contentPadding: EdgeInsets.zero,
+                            minLeadingWidth: 20,
+                            leading: Container(
+                              width: 24,
+                              height: 24,
+                              decoration: BoxDecoration(
+                                color: AppTheme.accent.withValues(alpha: 0.1),
+                                shape: BoxShape.circle,
                               ),
-                              title: Text(
-                                _commits[i],
-                                style: const TextStyle(
-                                  color: AppTheme.text,
-                                  fontFamily: 'monospace',
-                                  fontSize: 12,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
+                              child: const Icon(Icons.commit, size: 12, color: AppTheme.accent),
+                            ),
+                            title: Text(
+                              c.message,
+                              style: const TextStyle(color: AppTheme.text, fontSize: 12, fontWeight: FontWeight.w500),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle: Text(
+                              '${c.shortId}  ·  ${c.authorName}  ·  ${_fmtDate(c.commitTime)}',
+                              style: const TextStyle(color: AppTheme.textMuted, fontFamily: 'monospace', fontSize: 10),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 10),
+          // Timeline (all branches, no card)
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _sectionTitle(Icons.account_tree, AppLocalizations.of(context)!.graphicTimeline),
-                const SizedBox(height: 12),
-                Flexible(
-                  fit: FlexFit.loose,
-                  child: TimelineScreen(
-                    path: widget.project.path,
-                    api: widget.api,
-                  ),
-                ),
-              ],
+            child: TimelineScreen(
+              path: widget.project.path,
+              api: widget.api,
             ),
           ),
         ],
@@ -615,37 +718,63 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
   }
 
   Widget _buildTagsTab() {
+    final l10n = AppLocalizations.of(context)!;
     return Padding(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _actionButton(
+          ModernButton(
             icon: Icons.add,
-            label: AppLocalizations.of(context)!.newTag,
-            color: AppTheme.accent,
-            onPressed: () => _showInputDialog(AppLocalizations.of(context)!.newTag, AppLocalizations.of(context)!.tagName, (name) {
-              _showInputDialog(AppLocalizations.of(context)!.tagMessage, 'Mensagem (opcional)', (msg) {
+            label: l10n.newTag,
+            variant: ModernButtonVariant.primary,
+            compact: true,
+            tooltip: l10n.infoTooltipNewTag,
+            onPressed: () => _showInputDialog(l10n.newTag, l10n.tagName, (name) {
+              _showInputDialog(l10n.tagMessage, 'Mensagem (opcional)', (msg) {
                 _runAsync(() => widget.api.createTag(widget.project.path, name, msg));
               });
             }),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
           Expanded(
             child: _tags.isEmpty
-                ? Center(child: Text(AppLocalizations.of(context)!.noTags, style: const TextStyle(color: AppTheme.textMuted)))
+                ? Center(child: Text(l10n.noTags, style: const TextStyle(color: AppTheme.textMuted)))
                 : ListView.builder(
                     itemCount: _tags.length,
+                    padding: EdgeInsets.zero,
                     itemBuilder: (_, i) {
                       return Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.only(bottom: 6),
                         child: ModernCard(
-                          padding: const EdgeInsets.all(14),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           child: Row(
                             children: [
-                              const Icon(Icons.label_outline, color: AppTheme.accent, size: 18),
-                              const SizedBox(width: 12),
-                              Text(_tags[i], style: const TextStyle(color: AppTheme.text, fontSize: 14)),
+                              const Icon(Icons.label_outline, color: AppTheme.accent, size: 16),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(_tags[i], style: const TextStyle(color: AppTheme.text, fontSize: 13)),
+                              ),
+                              ModernButton(
+                                icon: Icons.delete_outline,
+                                variant: ModernButtonVariant.danger,
+                                tiny: true,
+                                tooltip: l10n.deleteTag,
+                                onPressed: () {
+                                  showDialog(
+                                    context: context,
+                                    builder: (_) => ModernConfirmDialog(
+                                      title: l10n.deleteTag,
+                                      message: l10n.deleteTagConfirm(_tags[i]),
+                                      confirmLabel: l10n.delete,
+                                      cancelLabel: l10n.cancel,
+                                      confirmVariant: ModernButtonVariant.danger,
+                                      icon: Icons.delete_outline,
+                                      onConfirm: () => _runAsync(() => widget.api.deleteTag(widget.project.path, _tags[i])),
+                                    ),
+                                  );
+                                },
+                              ),
                             ],
                           ),
                         ),
@@ -659,64 +788,72 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
   }
 
   Widget _buildStashTab() {
+    final l10n = AppLocalizations.of(context)!;
     return Padding(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Wrap(
-            spacing: 12,
-            runSpacing: 12,
+            spacing: 10,
+            runSpacing: 10,
             children: [
-              _actionButton(
+              ModernButton(
                 icon: Icons.add,
-                label: AppLocalizations.of(context)!.saveStash,
-                color: AppTheme.accent,
-                onPressed: () => _showInputDialog(AppLocalizations.of(context)!.saveStash, 'Mensagem (opcional)', (msg) {
+                label: l10n.saveStash,
+                variant: ModernButtonVariant.primary,
+                compact: true,
+                tooltip: l10n.infoTooltipStashSave,
+                onPressed: () => _showInputDialog(l10n.saveStash, 'Mensagem (opcional)', (msg) {
                   _runAsync(() => widget.api.stashSave(widget.project.path, msg));
                 }),
               ),
-              _actionButton(
+              ModernButton(
                 icon: Icons.download_outlined,
-                label: AppLocalizations.of(context)!.apply,
-                color: AppTheme.info,
+                label: l10n.apply,
+                variant: ModernButtonVariant.info,
+                compact: true,
+                tooltip: l10n.infoTooltipStashApply,
                 onPressed: () => _runAsync(() => widget.api.stashApply(widget.project.path, 0)),
               ),
-              _actionButton(
+              ModernButton(
                 icon: Icons.archive_outlined,
-                label: AppLocalizations.of(context)!.pop,
-                color: AppTheme.success,
+                label: l10n.pop,
+                variant: ModernButtonVariant.success,
+                compact: true,
+                tooltip: l10n.infoTooltipStashPop,
                 onPressed: () => _runAsync(() => widget.api.stashPop(widget.project.path, 0)),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 10),
           Expanded(
             child: _stashes.isEmpty
-                ? Center(child: Text(AppLocalizations.of(context)!.noStash, style: const TextStyle(color: AppTheme.textMuted)))
+                ? Center(child: Text(l10n.noStash, style: const TextStyle(color: AppTheme.textMuted)))
                 : ListView.builder(
                     itemCount: _stashes.length,
+                    padding: EdgeInsets.zero,
                     itemBuilder: (_, i) {
                       return Padding(
-                        padding: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.only(bottom: 6),
                         child: ModernCard(
-                          padding: const EdgeInsets.all(14),
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           child: Row(
                             children: [
                               Container(
-                                width: 28,
-                                height: 28,
+                                width: 24,
+                                height: 24,
                                 decoration: BoxDecoration(
                                   color: AppTheme.warning.withValues(alpha: 0.15),
                                   shape: BoxShape.circle,
                                 ),
-                                child: const Icon(Icons.archive_outlined, size: 14, color: AppTheme.warning),
+                                child: const Icon(Icons.archive_outlined, size: 12, color: AppTheme.warning),
                               ),
-                              const SizedBox(width: 12),
+                              const SizedBox(width: 10),
                               Expanded(
                                 child: Text(
                                   _stashes[i],
-                                  style: const TextStyle(color: AppTheme.text, fontSize: 13),
+                                  style: const TextStyle(color: AppTheme.text, fontSize: 12),
                                 ),
                               ),
                             ],
@@ -749,40 +886,38 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
     );
   }
 
-  Widget _actionButton({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onPressed,
-  }) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: onPressed,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 180),
-          curve: Curves.easeOut,
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-          decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: color.withValues(alpha: 0.35)),
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 18, color: color),
-              const SizedBox(width: 8),
-              Text(
-                label,
-                style: TextStyle(
-                  color: color,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
+  // REMOVED: _actionButton replaced by ModernButton throughout
+}
+
+// ------------------------------------------------------------------
+// Helpers
+// ------------------------------------------------------------------
+String _fmtDate(DateTime dt) {
+  return '${dt.day.toString().padLeft(2, '0')}/${dt.month.toString().padLeft(2, '0')}/${dt.year}'
+      ' ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+}
+
+class _BranchChip extends StatelessWidget {
+  final String name;
+  final Color color;
+
+  const _BranchChip({required this.name, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.4)),
+      ),
+      child: Text(
+        name,
+        style: TextStyle(
+          color: color,
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );

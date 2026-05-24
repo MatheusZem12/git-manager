@@ -90,6 +90,10 @@ class ApiService {
     return await _get('/git/status', query: {'path': path});
   }
 
+  Future<Map<String, dynamic>> getSyncStatus(String path) async {
+    return await _get('/git/sync-status', query: {'path': path});
+  }
+
   Future<List<BranchInfo>> getBranches(String path) async {
     final data = await _get('/git/branches', query: {'path': path}) as List;
     return data.map((e) => BranchInfo.fromJson(e)).toList();
@@ -149,6 +153,26 @@ class ApiService {
     return data['result'];
   }
 
+  Future<String> commitStaged(String path, String message, {String author = '', String email = ''}) async {
+    final data = await _post('/git/commit-staged', {
+      'path': path,
+      'message': message,
+      'authorName': author,
+      'authorEmail': email,
+    });
+    return data['result'];
+  }
+
+  Future<String> stageFiles(String path, List<String> files) async {
+    final data = await _post('/git/stage', {'path': path, 'files': files});
+    return data['result'];
+  }
+
+  Future<String> unstageFiles(String path, List<String> files) async {
+    final data = await _post('/git/unstage', {'path': path, 'files': files});
+    return data['result'];
+  }
+
   Future<String> push(String path, {String? username, String? password}) async {
     final data = await _post('/git/push', {'path': path, 'username': username ?? '', 'password': password ?? ''});
     return data['result'];
@@ -196,6 +220,51 @@ class ApiService {
 
   Future<String> reset(String path, String commitId, String mode) async {
     final data = await _post('/git/reset', {'path': path, 'commitId': commitId, 'mode': mode});
+    return data['result'];
+  }
+
+  Future<String> deleteBranch(String path, String branch) async {
+    final data = await _delete('/git/branch', query: {'path': path, 'branch': branch});
+    return data['result'];
+  }
+
+  Future<String> deleteTag(String path, String name) async {
+    final data = await _delete('/git/tag', query: {'path': path, 'name': name});
+    return data['result'];
+  }
+
+  Future<String> amendCommit(String path, String message, {String author = '', String email = ''}) async {
+    final data = await _post('/git/amend', {'path': path, 'message': message, 'authorName': author, 'authorEmail': email});
+    return data['result'];
+  }
+
+  Future<String> stashDrop(String path, int index) async {
+    final data = await _post('/git/stash-drop', {'path': path, 'index': index});
+    return data['result'];
+  }
+
+  Future<String> merge(String path, String branch) async {
+    final data = await _post('/git/merge', {'path': path, 'branch': branch});
+    return data['result'];
+  }
+
+  Future<String> cherryPick(String path, String commitId) async {
+    final data = await _post('/git/cherry-pick', {'path': path, 'commitId': commitId});
+    return data['result'];
+  }
+
+  Future<String> rebase(String path, String branch) async {
+    final data = await _post('/git/rebase', {'path': path, 'branch': branch});
+    return data['result'];
+  }
+
+  Future<List<Map<String, dynamic>>> getRemotes(String path) async {
+    final data = await _get('/git/remotes', query: {'path': path}) as List;
+    return data.cast<Map<String, dynamic>>();
+  }
+
+  Future<String> cloneRepo(String remoteUrl, String localPath, {String? username, String? password}) async {
+    final data = await _post('/git/clone', {'remoteUrl': remoteUrl, 'localPath': localPath, 'username': username ?? '', 'password': password ?? ''});
     return data['result'];
   }
 }

@@ -6,6 +6,11 @@ import com.gitmanager.model.GitFileChange;
 import com.gitmanager.model.GitProject;
 import org.eclipse.jgit.api.*;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.api.CherryPickCommand;
+import org.eclipse.jgit.api.CloneCommand;
+import org.eclipse.jgit.api.MergeCommand;
+import org.eclipse.jgit.api.RebaseCommand;
+import org.eclipse.jgit.api.ResetCommand;
 import org.eclipse.jgit.diff.DiffEntry;
 import org.eclipse.jgit.diff.DiffFormatter;
 import org.eclipse.jgit.errors.MissingObjectException;
@@ -13,9 +18,18 @@ import org.eclipse.jgit.lib.*;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
+import org.eclipse.jgit.transport.CredentialItem;
+import org.eclipse.jgit.transport.CredentialsProvider;
 import org.eclipse.jgit.transport.FetchResult;
 import org.eclipse.jgit.transport.PushResult;
+import org.eclipse.jgit.transport.SshTransport;
+import org.eclipse.jgit.transport.Transport;
+import org.eclipse.jgit.transport.TransportConfigCallback;
+import org.eclipse.jgit.transport.URIish;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
+import org.eclipse.jgit.transport.sshd.SshdSessionFactoryBuilder;
+import org.eclipse.jgit.util.FS;
+import org.eclipse.jgit.errors.UnsupportedCredentialItem;
 import org.eclipse.jgit.treewalk.AbstractTreeIterator;
 import org.eclipse.jgit.treewalk.CanonicalTreeParser;
 import org.eclipse.jgit.treewalk.FileTreeIterator;
@@ -24,18 +38,110 @@ import org.eclipse.jgit.util.io.DisabledOutputStream;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 public class GitService {
 
     private static final Logger log = LoggerFactory.getLogger(GitService.class);
+
+    private static final TransportConfigCallback SSH_TRANSPORT_CONFIG = new TransportConfigCallback() {
+        @Override
+        public void configure(Transport transport) {
+            if (transport instanceof SshTransport) {
+                ((SshTransport) transport).setSshSessionFactory(
+                    new SshdSessionFactoryBuilder()
+                        .setPreferredAuthentications("publickey,keyboard-interactive,password")
+                        .setHomeDirectory(FS.DETECTED.userHome())
+                        .setSshDirectory(new File(FS.DETECTED.userHome(), ".ssh"))
+                        .build(null)
+                );
+            }
+        }
+    };
+
+    /**
+     * Obtém a URL do remote "origin" do repositório.
+     */
+    private String getRemoteUrl(Git git) {
+        if (git == null) return null;
+        return git.getRepository().getConfig().getString("remote", "origin", "url");
+    }
+
+    /**
+     * CredentialsProvider que usa o git credential helper do sistema.
+     */
+    private static class SystemCredentialsProvider extends CredentialsProvider {
+        private final String url;
+        private String username;
+        private String password;
+
+        SystemCredentialsProvider(String url) {
+            this.url = url;
+        }
+
+        @Override
+        public boolean isInteractive() {
+            return false;
+        }
+
+        @Override
+        public boolean supports(CredentialItem... items) {
+            return true;
+        }
+
+        @Override
+        public boolean get(URIish uri, CredentialItem... items) throws UnsupportedCredentialItem {
+            if (username == null) {
+                loadFromGitCredential();
+            }
+            if (username == null) return false;
+            for (CredentialItem item : items) {
+                if (item instanceof CredentialItem.Username) {
+                    ((CredentialItem.Username) item).setValue(username);
+                } else if (item instanceof CredentialItem.Password) {
+                    ((CredentialItem.Password) item).setValue(password != null ? password.toCharArray() : new char[0]);
+                } else if (item instanceof CredentialItem.StringType) {
+                    ((CredentialItem.StringType) item).setValue(password != null ? password : "");
+                }
+            }
+            return true;
+        }
+
+        private void loadFromGitCredential() {
+            try {
+                ProcessBuilder pb = new ProcessBuilder("git", "credential", "fill");
+                pb.redirectErrorStream(true);
+                Process p = pb.start();
+                try (OutputStream os = p.getOutputStream();
+                     BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8))) {
+                    os.write(("url=" + url + "\n\n").getBytes(StandardCharsets.UTF_8));
+                    os.flush();
+                    p.waitFor(5, TimeUnit.SECONDS);
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        if (line.startsWith("username=")) {
+                            username = line.substring("username=".length());
+                        } else if (line.startsWith("password=")) {
+                            password = line.substring("password=".length());
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                log.debug("Falha ao obter credenciais do git credential: {}", e.getMessage());
+            }
+        }
+    }
 
     /**
      * Verifica se o diretório é um repositório git válido.
@@ -320,11 +426,24 @@ public class GitService {
                 return "Nenhum arquivo selecionado para commit.";
             }
 
+            Status status = git.status().call();
+            Set<String> missing = status.getMissing();
+
             AddCommand addCmd = git.add();
+            RmCommand rmCmd = git.rm();
+            boolean hasAdd = false;
+            boolean hasRm = false;
             for (String file : selectedFiles) {
-                addCmd.addFilepattern(file);
+                if (missing.contains(file)) {
+                    rmCmd.addFilepattern(file);
+                    hasRm = true;
+                } else {
+                    addCmd.addFilepattern(file);
+                    hasAdd = true;
+                }
             }
-            addCmd.call();
+            if (hasAdd) addCmd.call();
+            if (hasRm) rmCmd.call();
 
             CommitCommand commitCmd = git.commit().setMessage(message).setAllowEmpty(false);
             if (authorName != null && !authorName.isBlank()
@@ -341,14 +460,95 @@ public class GitService {
     }
 
     /**
+     * Executa git add nos arquivos selecionados (stage).
+     */
+    public String stageFiles(String path, List<String> files) {
+        try (Git git = openGit(path)) {
+            if (git == null) return "Repositório inacessível.";
+            if (files == null || files.isEmpty()) {
+                return "Nenhum arquivo selecionado para stage.";
+            }
+            Status status = git.status().call();
+            Set<String> missing = status.getMissing();
+
+            AddCommand addCmd = git.add();
+            RmCommand rmCmd = git.rm();
+            boolean hasAdd = false;
+            boolean hasRm = false;
+            for (String file : files) {
+                if (missing.contains(file)) {
+                    rmCmd.addFilepattern(file);
+                    hasRm = true;
+                } else {
+                    addCmd.addFilepattern(file);
+                    hasAdd = true;
+                }
+            }
+            if (hasAdd) addCmd.call();
+            if (hasRm) rmCmd.call();
+            return files.size() + " arquivo(s) adicionado(s) ao stage.";
+        } catch (GitAPIException e) {
+            log.error("Erro no stage de '{}': {}", path, e.getMessage());
+            return "Erro no stage: " + e.getMessage();
+        }
+    }
+
+    /**
+     * Executa git reset HEAD nos arquivos selecionados (unstage).
+     */
+    public String unstageFiles(String path, List<String> files) {
+        try (Git git = openGit(path)) {
+            if (git == null) return "Repositório inacessível.";
+            if (files == null || files.isEmpty()) {
+                return "Nenhum arquivo selecionado para unstage.";
+            }
+            ResetCommand reset = git.reset();
+            for (String file : files) {
+                reset.addPath(file);
+            }
+            reset.call();
+            return files.size() + " arquivo(s) removido(s) do stage.";
+        } catch (GitAPIException e) {
+            log.error("Erro no unstage de '{}': {}", path, e.getMessage());
+            return "Erro no unstage: " + e.getMessage();
+        }
+    }
+
+    /**
+     * Executa commit apenas do que está staged.
+     */
+    public String commitStaged(String path, String message,
+                               String authorName, String authorEmail) {
+        try (Git git = openGit(path)) {
+            if (git == null) return "Repositório inacessível.";
+            CommitCommand commitCmd = git.commit().setMessage(message).setAllowEmpty(false);
+            if (authorName != null && !authorName.isBlank()
+                    && authorEmail != null && !authorEmail.isBlank()) {
+                commitCmd.setAuthor(authorName, authorEmail);
+            }
+            RevCommit commit = commitCmd.call();
+            return "Commit realizado: " + commit.abbreviate(7).name() + " – " + commit.getShortMessage();
+        } catch (GitAPIException e) {
+            log.error("Erro no commit de '{}': {}", path, e.getMessage());
+            return "Erro no commit: " + e.getMessage();
+        }
+    }
+
+    /**
      * Executa git push (origin, branch atual).
      */
     public String push(String path, String username, String password) {
         try (Git git = openGit(path)) {
             if (git == null) return "Repositório inacessível.";
             PushCommand push = git.push();
+            push.setTransportConfigCallback(SSH_TRANSPORT_CONFIG);
             if (username != null && !username.isBlank()) {
                 push.setCredentialsProvider(new UsernamePasswordCredentialsProvider(username, password));
+            } else {
+                String remoteUrl = getRemoteUrl(git);
+                if (remoteUrl != null) {
+                    push.setCredentialsProvider(new SystemCredentialsProvider(remoteUrl));
+                }
             }
             Iterable<PushResult> results = push.call();
             StringBuilder sb = new StringBuilder();
@@ -371,8 +571,14 @@ public class GitService {
         try (Git git = openGit(path)) {
             if (git == null) return "Repositório inacessível.";
             PullCommand pull = git.pull();
+            pull.setTransportConfigCallback(SSH_TRANSPORT_CONFIG);
             if (username != null && !username.isBlank()) {
                 pull.setCredentialsProvider(new UsernamePasswordCredentialsProvider(username, password));
+            } else {
+                String remoteUrl = getRemoteUrl(git);
+                if (remoteUrl != null) {
+                    pull.setCredentialsProvider(new SystemCredentialsProvider(remoteUrl));
+                }
             }
             PullResult result = pull.call();
             if (result.isSuccessful()) {
@@ -393,8 +599,14 @@ public class GitService {
         try (Git git = openGit(path)) {
             if (git == null) return "Repositório inacessível.";
             FetchCommand fetch = git.fetch();
+            fetch.setTransportConfigCallback(SSH_TRANSPORT_CONFIG);
             if (username != null && !username.isBlank()) {
                 fetch.setCredentialsProvider(new UsernamePasswordCredentialsProvider(username, password));
+            } else {
+                String remoteUrl = getRemoteUrl(git);
+                if (remoteUrl != null) {
+                    fetch.setCredentialsProvider(new SystemCredentialsProvider(remoteUrl));
+                }
             }
             FetchResult result = fetch.call();
             String updates = result.getTrackingRefUpdates().isEmpty()
@@ -404,6 +616,65 @@ public class GitService {
             log.error("Erro no fetch de '{}': {}", path, e.getMessage());
             return "Erro no fetch: " + e.getMessage();
         }
+    }
+
+    /**
+     * Retorna o status de sincronização com o remote (ahead/behind).
+     */
+    public Map<String, Object> getSyncStatus(String path) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("ahead", 0);
+        result.put("behind", 0);
+        result.put("hasRemote", false);
+        result.put("remoteUrl", "");
+        try (Git git = openGit(path)) {
+            if (git == null) return result;
+            Repository repo = git.getRepository();
+            String currentBranch = repo.getBranch();
+            if (currentBranch == null) return result;
+
+            StoredConfig config = repo.getConfig();
+            String remoteUrl = config.getString("remote", "origin", "url");
+            result.put("hasRemote", remoteUrl != null && !remoteUrl.isBlank());
+            result.put("remoteUrl", remoteUrl != null ? remoteUrl : "");
+
+            BranchConfig branchConfig = new BranchConfig(config, currentBranch);
+            String trackingBranch = branchConfig.getRemoteTrackingBranch();
+            if (trackingBranch == null || trackingBranch.isBlank()) {
+                return result;
+            }
+
+            ObjectId localId = repo.resolve("HEAD");
+            ObjectId remoteId = repo.resolve(trackingBranch);
+            if (localId == null || remoteId == null) return result;
+
+            try (RevWalk walk = new RevWalk(repo)) {
+                RevCommit localCommit = walk.parseCommit(localId);
+                RevCommit remoteCommit = walk.parseCommit(remoteId);
+
+                walk.reset();
+                walk.markStart(localCommit);
+                walk.markUninteresting(remoteCommit);
+                int ahead = 0;
+                for (RevCommit c : walk) {
+                    ahead++;
+                }
+
+                walk.reset();
+                walk.markStart(remoteCommit);
+                walk.markUninteresting(localCommit);
+                int behind = 0;
+                for (RevCommit c : walk) {
+                    behind++;
+                }
+
+                result.put("ahead", ahead);
+                result.put("behind", behind);
+            }
+        } catch (Exception e) {
+            log.debug("Erro ao obter sync status de '{}': {}", path, e.getMessage());
+        }
+        return result;
     }
 
     /**
@@ -434,6 +705,114 @@ public class GitService {
         }
     }
 
+    public String deleteBranch(String path, String branchName) {
+        try (Git git = openGit(path)) {
+            if (git == null) return "Repositório inacessível.";
+            git.branchDelete().setBranchNames(branchName).setForce(true).call();
+            return "Branch '" + branchName + "' removida.";
+        } catch (GitAPIException e) {
+            log.error("Erro ao deletar branch '{}' em '{}': {}", branchName, path, e.getMessage());
+            return "Erro ao deletar branch: " + e.getMessage();
+        }
+    }
+
+    public String amendCommit(String path, String message, String authorName, String authorEmail) {
+        try (Git git = openGit(path)) {
+            if (git == null) return "Repositório inacessível.";
+            CommitCommand cmd = git.commit().setAmend(true).setAllowEmpty(false);
+            if (message != null && !message.isBlank()) {
+                cmd.setMessage(message);
+            }
+            if (authorName != null && !authorName.isBlank() && authorEmail != null && !authorEmail.isBlank()) {
+                cmd.setAuthor(authorName, authorEmail);
+            }
+            RevCommit commit = cmd.call();
+            return "Commit amendado: " + commit.abbreviate(7).name() + " – " + commit.getShortMessage();
+        } catch (GitAPIException e) {
+            log.error("Erro no amend de '{}': {}", path, e.getMessage());
+            return "Erro no amend: " + e.getMessage();
+        }
+    }
+
+    public String merge(String path, String branchName) {
+        try (Git git = openGit(path)) {
+            if (git == null) return "Repositório inacessível.";
+            MergeResult result = git.merge().include(git.getRepository().resolve(branchName)).call();
+            if (result.getMergeStatus().isSuccessful()) {
+                return "Merge realizado com sucesso.";
+            } else {
+                return "Merge conflitoso. Resolva os conflitos manualmente.";
+            }
+        } catch (GitAPIException e) {
+            log.error("Erro no merge de '{}': {}", path, e.getMessage());
+            return "Erro no merge: " + e.getMessage();
+        }
+    }
+
+    public String cherryPick(String path, String commitId) {
+        try (Git git = openGit(path)) {
+            if (git == null) return "Repositório inacessível.";
+            ObjectId oid = git.getRepository().resolve(commitId);
+            if (oid == null) return "Commit não encontrado.";
+            CherryPickResult result = git.cherryPick().include(oid).call();
+            if (result.getStatus() == CherryPickResult.CherryPickStatus.OK) {
+                return "Cherry-pick realizado com sucesso.";
+            } else {
+                return "Cherry-pick conflitoso. Resolva os conflitos manualmente.";
+            }
+        } catch (GitAPIException e) {
+            log.error("Erro no cherry-pick de '{}': {}", path, e.getMessage());
+            return "Erro no cherry-pick: " + e.getMessage();
+        }
+    }
+
+    public String rebase(String path, String branchName) {
+        try (Git git = openGit(path)) {
+            if (git == null) return "Repositório inacessível.";
+            RebaseResult result = git.rebase().setUpstream(branchName).call();
+            if (result.getStatus().isSuccessful()) {
+                return "Rebase realizado com sucesso.";
+            } else {
+                return "Rebase conflitoso. Resolva os conflitos manualmente.";
+            }
+        } catch (GitAPIException e) {
+            log.error("Erro no rebase de '{}': {}", path, e.getMessage());
+            return "Erro no rebase: " + e.getMessage();
+        }
+    }
+
+    public List<Map<String, String>> getRemotes(String path) {
+        List<Map<String, String>> remotes = new ArrayList<>();
+        try (Git git = openGit(path)) {
+            if (git == null) return remotes;
+            StoredConfig config = git.getRepository().getConfig();
+            for (String name : config.getSubsections("remote")) {
+                Map<String, String> r = new LinkedHashMap<>();
+                r.put("name", name);
+                r.put("url", config.getString("remote", name, "url"));
+                remotes.add(r);
+            }
+        } catch (Exception e) {
+            log.debug("Erro ao listar remotes de '{}': {}", path, e.getMessage());
+        }
+        return remotes;
+    }
+
+    public String cloneRepo(String remoteUrl, String localPath, String username, String password) {
+        try {
+            CloneCommand clone = Git.cloneRepository().setURI(remoteUrl).setDirectory(new File(localPath));
+            if (username != null && !username.isBlank()) {
+                clone.setCredentialsProvider(new UsernamePasswordCredentialsProvider(username, password));
+            }
+            Git git = clone.call();
+            git.close();
+            return "Clone realizado com sucesso em: " + localPath;
+        } catch (GitAPIException e) {
+            log.error("Erro no clone de '{}': {}", remoteUrl, e.getMessage());
+            return "Erro no clone: " + e.getMessage();
+        }
+    }
+
     // ---- Tags ----
 
     public List<String> getTags(String path) {
@@ -458,6 +837,17 @@ public class GitService {
         } catch (Exception e) {
             log.error("Erro ao criar tag em '{}': {}", path, e.getMessage());
             return "Erro ao criar tag: " + e.getMessage();
+        }
+    }
+
+    public String deleteTag(String path, String name) {
+        try (Git git = openGit(path)) {
+            if (git == null) return "Repositório inacessível.";
+            git.tagDelete().setTags(name).call();
+            return "Tag '" + name + "' removida.";
+        } catch (Exception e) {
+            log.error("Erro ao deletar tag em '{}': {}", path, e.getMessage());
+            return "Erro ao deletar tag: " + e.getMessage();
         }
     }
 
@@ -514,6 +904,17 @@ public class GitService {
         } catch (Exception e) {
             log.error("Erro ao aplicar stash em '{}': {}", path, e.getMessage());
             return "Erro ao aplicar stash: " + e.getMessage();
+        }
+    }
+
+    public String stashDrop(String path, int index) {
+        try (Git git = openGit(path)) {
+            if (git == null) return "Repositório inacessível.";
+            git.stashDrop().setStashRef(index).call();
+            return "Stash removido.";
+        } catch (Exception e) {
+            log.error("Erro ao remover stash em '{}': {}", path, e.getMessage());
+            return "Erro ao remover stash: " + e.getMessage();
         }
     }
 

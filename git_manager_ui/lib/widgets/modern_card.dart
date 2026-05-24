@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../theme.dart';
 
-class ModernCard extends StatelessWidget {
+class ModernCard extends StatefulWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
   final double? width;
@@ -24,34 +24,49 @@ class ModernCard extends StatelessWidget {
   });
 
   @override
+  State<ModernCard> createState() => _ModernCardState();
+}
+
+class _ModernCardState extends State<ModernCard> {
+  bool _hover = false;
+
+  @override
   Widget build(BuildContext context) {
-    final radius = borderRadius ?? BorderRadius.circular(16);
+    final radius = widget.borderRadius ?? BorderRadius.circular(16);
     return MouseRegion(
-      cursor: onTap != null ? SystemMouseCursors.click : SystemMouseCursors.basic,
+      cursor: widget.onTap != null ? SystemMouseCursors.click : SystemMouseCursors.basic,
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
       child: GestureDetector(
-        onTap: onTap,
+        onTap: widget.onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeOut,
-          width: width,
-          height: height,
+          width: widget.width,
+          height: widget.height,
           decoration: BoxDecoration(
-            color: color ?? AppTheme.surface,
+            color: widget.color ?? AppTheme.surface,
             borderRadius: radius,
-            border: Border.all(color: AppTheme.borderStrong.withValues(alpha: 0.5), width: 1),
-            boxShadow: boxShadow ?? [
+            border: Border.all(
+              color: _hover
+                  ? AppTheme.borderFocus
+                  : AppTheme.borderStrong.withValues(alpha: 0.5),
+              width: 1,
+            ),
+            boxShadow: widget.boxShadow ?? [
               BoxShadow(
-                color: Colors.black.withValues(alpha: 0.25),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
+                color: Colors.black.withValues(alpha: _hover ? 0.35 : 0.2),
+                blurRadius: _hover ? 20 : 12,
+                spreadRadius: _hover ? 1 : 0,
+                offset: const Offset(0, 6),
               ),
             ],
           ),
           child: ClipRRect(
             borderRadius: radius,
             child: Padding(
-              padding: padding,
-              child: child,
+              padding: widget.padding,
+              child: widget.child,
             ),
           ),
         ),

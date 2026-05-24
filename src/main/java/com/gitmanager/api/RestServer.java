@@ -57,6 +57,7 @@ public class RestServer {
 
         // ---------- Git Operations ----------
         app.get("/api/git/status", this::getStatus);
+        app.get("/api/git/sync-status", this::getSyncStatus);
         app.get("/api/git/branches", this::getBranches);
         app.get("/api/git/commits", this::getCommits);
         app.get("/api/git/graph", this::getCommitGraph);
@@ -69,6 +70,9 @@ public class RestServer {
         app.get("/api/git/file-diff", this::getFileDiff);
 
         app.post("/api/git/commit", this::doCommit);
+        app.post("/api/git/commit-staged", this::doCommitStaged);
+        app.post("/api/git/stage", this::doStage);
+        app.post("/api/git/unstage", this::doUnstage);
         app.post("/api/git/push", this::doPush);
         app.post("/api/git/pull", this::doPull);
         app.post("/api/git/fetch", this::doFetch);
@@ -79,6 +83,15 @@ public class RestServer {
         app.post("/api/git/stash-pop", this::doStashPop);
         app.post("/api/git/stash-apply", this::doStashApply);
         app.post("/api/git/reset", this::doReset);
+        app.delete("/api/git/branch", this::doDeleteBranch);
+        app.delete("/api/git/tag", this::doDeleteTag);
+        app.post("/api/git/amend", this::doAmend);
+        app.post("/api/git/stash-drop", this::doStashDrop);
+        app.post("/api/git/merge", this::doMerge);
+        app.post("/api/git/cherry-pick", this::doCherryPick);
+        app.post("/api/git/rebase", this::doRebase);
+        app.get("/api/git/remotes", this::getRemotes);
+        app.post("/api/git/clone", this::doClone);
 
         app.start(port);
         System.out.println("Git Manager REST API running on http://localhost:" + port);
@@ -156,6 +169,12 @@ public class RestServer {
                 "head", head != null ? head : "",
                 "remote", remote != null ? remote : ""
         ));
+    }
+
+    private void getSyncStatus(Context ctx) {
+        String path = requirePath(ctx);
+        if (path == null) return;
+        ctx.json(gitService.getSyncStatus(path));
     }
 
     private void getBranches(Context ctx) {
@@ -260,6 +279,44 @@ public class RestServer {
         }
     }
 
+    private void doCommitStaged(Context ctx) {
+        try {
+            Map<String, String> body = mapper.readValue(ctx.body(), Map.class);
+            String path = body.get("path");
+            String message = body.get("message");
+            String author = body.getOrDefault("authorName", "");
+            String email = body.getOrDefault("authorEmail", "");
+            String result = gitService.commitStaged(path, message, author, email);
+            ctx.json(Map.of("result", result));
+        } catch (Exception e) {
+            ctx.status(HttpStatus.BAD_REQUEST).json(Map.of("error", e.getMessage()));
+        }
+    }
+
+    private void doStage(Context ctx) {
+        try {
+            Map<String, Object> body = mapper.readValue(ctx.body(), Map.class);
+            String path = (String) body.get("path");
+            List<String> files = (List<String>) body.get("files");
+            String result = gitService.stageFiles(path, files);
+            ctx.json(Map.of("result", result));
+        } catch (Exception e) {
+            ctx.status(HttpStatus.BAD_REQUEST).json(Map.of("error", e.getMessage()));
+        }
+    }
+
+    private void doUnstage(Context ctx) {
+        try {
+            Map<String, Object> body = mapper.readValue(ctx.body(), Map.class);
+            String path = (String) body.get("path");
+            List<String> files = (List<String>) body.get("files");
+            String result = gitService.unstageFiles(path, files);
+            ctx.json(Map.of("result", result));
+        } catch (Exception e) {
+            ctx.status(HttpStatus.BAD_REQUEST).json(Map.of("error", e.getMessage()));
+        }
+    }
+
     private void doPush(Context ctx) {
         try {
             Map<String, String> body = mapper.readValue(ctx.body(), Map.class);
@@ -358,6 +415,96 @@ public class RestServer {
         try {
             Map<String, String> body = mapper.readValue(ctx.body(), Map.class);
             String result = gitService.reset(body.get("path"), body.get("commitId"), body.get("mode"));
+            ctx.json(Map.of("result", result));
+        } catch (Exception e) {
+            ctx.status(HttpStatus.BAD_REQUEST).json(Map.of("error", e.getMessage()));
+        }
+    }
+
+    private void doDeleteBranch(Context ctx) {
+        try {
+            String path = ctx.queryParam("path");
+            String branch = ctx.queryParam("branch");
+            String result = gitService.deleteBranch(path, branch);
+            ctx.json(Map.of("result", result));
+        } catch (Exception e) {
+            ctx.status(HttpStatus.BAD_REQUEST).json(Map.of("error", e.getMessage()));
+        }
+    }
+
+    private void doDeleteTag(Context ctx) {
+        try {
+            String path = ctx.queryParam("path");
+            String name = ctx.queryParam("name");
+            String result = gitService.deleteTag(path, name);
+            ctx.json(Map.of("result", result));
+        } catch (Exception e) {
+            ctx.status(HttpStatus.BAD_REQUEST).json(Map.of("error", e.getMessage()));
+        }
+    }
+
+    private void doAmend(Context ctx) {
+        try {
+            Map<String, String> body = mapper.readValue(ctx.body(), Map.class);
+            String result = gitService.amendCommit(body.get("path"), body.get("message"), body.get("authorName"), body.get("authorEmail"));
+            ctx.json(Map.of("result", result));
+        } catch (Exception e) {
+            ctx.status(HttpStatus.BAD_REQUEST).json(Map.of("error", e.getMessage()));
+        }
+    }
+
+    private void doStashDrop(Context ctx) {
+        try {
+            Map<String, Object> body = mapper.readValue(ctx.body(), Map.class);
+            String path = (String) body.get("path");
+            int index = ((Number) body.getOrDefault("index", 0)).intValue();
+            String result = gitService.stashDrop(path, index);
+            ctx.json(Map.of("result", result));
+        } catch (Exception e) {
+            ctx.status(HttpStatus.BAD_REQUEST).json(Map.of("error", e.getMessage()));
+        }
+    }
+
+    private void doMerge(Context ctx) {
+        try {
+            Map<String, String> body = mapper.readValue(ctx.body(), Map.class);
+            String result = gitService.merge(body.get("path"), body.get("branch"));
+            ctx.json(Map.of("result", result));
+        } catch (Exception e) {
+            ctx.status(HttpStatus.BAD_REQUEST).json(Map.of("error", e.getMessage()));
+        }
+    }
+
+    private void doCherryPick(Context ctx) {
+        try {
+            Map<String, String> body = mapper.readValue(ctx.body(), Map.class);
+            String result = gitService.cherryPick(body.get("path"), body.get("commitId"));
+            ctx.json(Map.of("result", result));
+        } catch (Exception e) {
+            ctx.status(HttpStatus.BAD_REQUEST).json(Map.of("error", e.getMessage()));
+        }
+    }
+
+    private void doRebase(Context ctx) {
+        try {
+            Map<String, String> body = mapper.readValue(ctx.body(), Map.class);
+            String result = gitService.rebase(body.get("path"), body.get("branch"));
+            ctx.json(Map.of("result", result));
+        } catch (Exception e) {
+            ctx.status(HttpStatus.BAD_REQUEST).json(Map.of("error", e.getMessage()));
+        }
+    }
+
+    private void getRemotes(Context ctx) {
+        String path = requirePath(ctx);
+        if (path == null) return;
+        ctx.json(gitService.getRemotes(path));
+    }
+
+    private void doClone(Context ctx) {
+        try {
+            Map<String, String> body = mapper.readValue(ctx.body(), Map.class);
+            String result = gitService.cloneRepo(body.get("remoteUrl"), body.get("localPath"), body.get("username"), body.get("password"));
             ctx.json(Map.of("result", result));
         } catch (Exception e) {
             ctx.status(HttpStatus.BAD_REQUEST).json(Map.of("error", e.getMessage()));

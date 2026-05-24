@@ -8,8 +8,22 @@ void main() {
   runApp(const GitManagerApp());
 }
 
-class GitManagerApp extends StatelessWidget {
+class GitManagerApp extends StatefulWidget {
   const GitManagerApp({super.key});
+
+  @override
+  State<GitManagerApp> createState() => GitManagerAppState();
+
+  static GitManagerAppState? of(BuildContext context) =>
+      context.findAncestorStateOfType<GitManagerAppState>();
+}
+
+class GitManagerAppState extends State<GitManagerApp> {
+  Locale _locale = const Locale('pt');
+
+  void setLocale(Locale locale) {
+    setState(() => _locale = locale);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -17,15 +31,18 @@ class GitManagerApp extends StatelessWidget {
       title: 'Git Manager',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
-      localizationsDelegates: [
+      localizationsDelegates: const [
         AppLocalizations.delegate,
         GlobalMaterialLocalizations.delegate,
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      supportedLocales: const [Locale('pt'), Locale('en')],
-      locale: const Locale('pt'),
-      home: const DashboardScreen(),
+      supportedLocales: const [Locale('pt'), Locale('en'), Locale('es')],
+      locale: _locale,
+      home: DashboardScreen(
+        locale: _locale,
+        onLocaleChange: setLocale,
+      ),
     );
   }
 }
