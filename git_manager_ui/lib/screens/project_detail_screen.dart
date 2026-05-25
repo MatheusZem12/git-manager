@@ -9,6 +9,7 @@ import '../theme.dart';
 import '../widgets/modern_button.dart';
 import '../widgets/modern_card.dart';
 import '../widgets/modern_dialog.dart';
+import '../widgets/ssh_setup_dialog.dart';
 import 'staging_screen.dart';
 import 'timeline_screen.dart';
 
@@ -132,8 +133,19 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
       final result = await action();
       _log(result);
       await _loadData();
+      if (result.contains('Permission denied') || result.contains('publickey') || result.contains('Cannot log in')) {
+        if (mounted) {
+          _log('💡 Dica: configure sua chave SSH clicando no ícone de chave 🔑 no topo.');
+        }
+      }
     } catch (e) {
-      _log('❌ Erro: $e');
+      final msg = e.toString();
+      _log('❌ Erro: $msg');
+      if (msg.contains('Permission denied') || msg.contains('publickey') || msg.contains('Cannot log in')) {
+        if (mounted) {
+          SshSetupDialog.show(context, widget.api);
+        }
+      }
     }
   }
 
@@ -330,6 +342,11 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
           ],
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.vpn_key_outlined),
+            onPressed: () => SshSetupDialog.show(context, widget.api),
+            tooltip: 'Configurar SSH',
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadData,

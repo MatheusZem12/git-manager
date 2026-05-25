@@ -8,6 +8,7 @@ import com.gitmanager.model.GitFileChange;
 import com.gitmanager.model.GitProject;
 import com.gitmanager.service.GitService;
 import com.gitmanager.service.ProjectService;
+import com.gitmanager.service.SshService;
 import io.javalin.Javalin;
 import io.javalin.http.Context;
 import io.javalin.http.HttpStatus;
@@ -25,6 +26,7 @@ public class RestServer {
     private final int port;
     private final ProjectService projectService;
     private final GitService gitService;
+    private final SshService sshService;
     private final ObjectMapper mapper;
     private Javalin app;
 
@@ -32,6 +34,7 @@ public class RestServer {
         this.port = port;
         this.projectService = new ProjectService();
         this.gitService = projectService.getGitService();
+        this.sshService = new SshService();
         this.mapper = new ObjectMapper();
         this.mapper.registerModule(new JavaTimeModule());
     }
@@ -82,6 +85,11 @@ public class RestServer {
         app.post("/api/git/stash-save", this::doStashSave);
         app.post("/api/git/stash-pop", this::doStashPop);
         app.post("/api/git/stash-apply", this::doStashApply);
+
+        // ---------- SSH ----------
+        app.get("/api/ssh/status", this::getSshStatus);
+        app.post("/api/ssh/generate", this::doGenerateSshKey);
+        app.post("/api/ssh/copy", this::doCopySshKey);
         app.post("/api/git/reset", this::doReset);
         app.delete("/api/git/branch", this::doDeleteBranch);
         app.delete("/api/git/tag", this::doDeleteTag);
@@ -509,5 +517,19 @@ public class RestServer {
         } catch (Exception e) {
             ctx.status(HttpStatus.BAD_REQUEST).json(Map.of("error", e.getMessage()));
         }
+    }
+
+    private void getSshStatus(Context ctx) {
+        ctx.json(sshService.getSshStatus());
+    }
+
+    private void doGenerateSshKey(Context ctx) {
+        String result = sshService.generateSshKey();
+        ctx.json(Map.of("result", result));
+    }
+
+    private void doCopySshKey(Context ctx) {
+        String result = sshService.copyPublicKeyToClipboard();
+        ctx.json(Map.of("result", result));
     }
 }
