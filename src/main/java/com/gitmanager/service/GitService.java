@@ -536,18 +536,69 @@ public class GitService {
         }
     }
 
+    private boolean isSshRemote(String url) {
+        return url != null && (url.startsWith("git@") || url.startsWith("ssh://"));
+    }
+
+    private String execGitCommand(String repoPath, String... args) {
+        try {
+            List<String> cmd = new ArrayList<>();
+            cmd.add("git");
+            cmd.addAll(Arrays.asList(args));
+            ProcessBuilder pb = new ProcessBuilder(cmd);
+            pb.directory(new File(repoPath));
+            pb.redirectErrorStream(true);
+            Process p = pb.start();
+            boolean finished = p.waitFor(60, TimeUnit.SECONDS);
+            if (!finished) {
+                p.destroyForcibly();
+                return "Erro: comando excedeu o tempo limite.";
+            }
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream(), StandardCharsets.UTF_8))) {
+                StringBuilder sb = new StringBuilder();
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    if (line.contains("Enumerating objects") ||
+                        line.contains("Counting objects") ||
+                        line.contains("Compressing objects") ||
+                        line.contains("Writing objects") ||
+                        line.contains("Resolving deltas") ||
+                        line.contains("Total")) {
+                        continue;
+                    }
+                    if (sb.length() > 0) sb.append("\n");
+                    sb.append(line);
+                }
+                String output = sb.toString().trim();
+                if (p.exitValue() != 0) {
+                    return "Erro: " + (output.isEmpty() ? "comando falhou" : output);
+                }
+                return output.isEmpty() ? "Comando executado com sucesso." : output;
+            }
+        } catch (Exception e) {
+            log.error("Erro ao executar comando git em '{}': {}", repoPath, e.getMessage());
+            return "Erro ao executar comando git: " + e.getMessage();
+        }
+    }
+
     /**
      * Executa git push (origin, branch atual).
      */
     public String push(String path, String username, String password) {
         try (Git git = openGit(path)) {
             if (git == null) return "Repositório inacessível.";
+            String remoteUrl = getRemoteUrl(git);
+            if (username == null || username.isBlank()) {
+                if (remoteUrl != null && isSshRemote(remoteUrl)) {
+                    String output = execGitCommand(path, "push");
+                    return output.startsWith("Erro:") ? output : "Push realizado com sucesso." + (output.isEmpty() || output.equals("Comando executado com sucesso.") ? "" : "\n" + output);
+                }
+            }
             PushCommand push = git.push();
             push.setTransportConfigCallback(SSH_TRANSPORT_CONFIG);
             if (username != null && !username.isBlank()) {
                 push.setCredentialsProvider(new UsernamePasswordCredentialsProvider(username, password));
             } else {
-                String remoteUrl = getRemoteUrl(git);
                 if (remoteUrl != null) {
                     push.setCredentialsProvider(new SystemCredentialsProvider(remoteUrl));
                 }
@@ -580,7 +631,7 @@ public class GitService {
             if (updates.isEmpty()) {
                 return "Push realizado com sucesso.";
             }
-            return "Push realizado com sucesso.\\n" + String.join("\\n", updates);
+            return "Push realizado com sucesso.\n" + String.join("\n", updates);
         } catch (GitAPIException e) {
             log.error("Erro no push de '{}': {}", path, e.getMessage());
             return "Erro no push: " + e.getMessage();
@@ -593,12 +644,18 @@ public class GitService {
     public String pull(String path, String username, String password) {
         try (Git git = openGit(path)) {
             if (git == null) return "Repositório inacessível.";
+            String remoteUrl = getRemoteUrl(git);
+            if (username == null || username.isBlank()) {
+                if (remoteUrl != null && isSshRemote(remoteUrl)) {
+                    String output = execGitCommand(path, "pull");
+                    return output.startsWith("Erro:") ? output : "Pull realizado com sucesso." + (output.isEmpty() || output.equals("Comando executado com sucesso.") ? "" : "\n" + output);
+                }
+            }
             PullCommand pull = git.pull();
             pull.setTransportConfigCallback(SSH_TRANSPORT_CONFIG);
             if (username != null && !username.isBlank()) {
                 pull.setCredentialsProvider(new UsernamePasswordCredentialsProvider(username, password));
             } else {
-                String remoteUrl = getRemoteUrl(git);
                 if (remoteUrl != null) {
                     pull.setCredentialsProvider(new SystemCredentialsProvider(remoteUrl));
                 }
@@ -621,12 +678,18 @@ public class GitService {
     public String fetch(String path, String username, String password) {
         try (Git git = openGit(path)) {
             if (git == null) return "Repositório inacessível.";
+            String remoteUrl = getRemoteUrl(git);
+            if (username == null || username.isBlank()) {
+                if (remoteUrl != null && isSshRemote(remoteUrl)) {
+                    String output = execGitCommand(path, "fetch");
+                    return output.startsWith("Erro:") ? output : "Fetch concluído." + (output.isEmpty() || output.equals("Comando executado com sucesso.") ? "" : "\n" + output);
+                }
+            }
             FetchCommand fetch = git.fetch();
             fetch.setTransportConfigCallback(SSH_TRANSPORT_CONFIG);
             if (username != null && !username.isBlank()) {
                 fetch.setCredentialsProvider(new UsernamePasswordCredentialsProvider(username, password));
             } else {
-                String remoteUrl = getRemoteUrl(git);
                 if (remoteUrl != null) {
                     fetch.setCredentialsProvider(new SystemCredentialsProvider(remoteUrl));
                 }
