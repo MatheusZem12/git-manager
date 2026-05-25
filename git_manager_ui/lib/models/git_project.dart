@@ -6,6 +6,8 @@ class GitProject {
   final bool hasGit;
   final String currentBranch;
   final String statusSummary;
+  final int ahead;
+  final int behind;
 
   GitProject({
     required this.name,
@@ -15,6 +17,8 @@ class GitProject {
     this.hasGit = false,
     this.currentBranch = '',
     this.statusSummary = '',
+    this.ahead = 0,
+    this.behind = 0,
   });
 
   factory GitProject.fromJson(Map<String, dynamic> json) {
@@ -26,6 +30,8 @@ class GitProject {
       hasGit: json['hasGit'] ?? false,
       currentBranch: json['currentBranch'] ?? '',
       statusSummary: json['statusSummary'] ?? '',
+      ahead: json['ahead'] ?? 0,
+      behind: json['behind'] ?? 0,
     );
   }
 
@@ -37,6 +43,8 @@ class GitProject {
         'hasGit': hasGit,
         'currentBranch': currentBranch,
         'statusSummary': statusSummary,
+        'ahead': ahead,
+        'behind': behind,
       };
 
   bool get isAvailable => existsOnDisk && hasGit;

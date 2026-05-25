@@ -15,6 +15,7 @@
   "ok": "OK",
   "alt": "ALT",
   "unavailable": "INDISP.",
+  "withChanges": "ALTERAÇÕES",
   "noRepos": "Nenhum repositório",
   "noReposHint": "Use o botão abaixo para cadastrar um diretório git.",
   "selectRepo": "Selecione um repositório",

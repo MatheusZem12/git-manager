@@ -11,6 +11,8 @@ public class GitProject {
     private transient boolean hasGit;
     private transient String currentBranch;
     private transient String statusSummary;
+    private transient int ahead;
+    private transient int behind;
 
     public GitProject() {}
 
@@ -34,6 +36,12 @@ public class GitProject {
 
     public String getStatusSummary() { return statusSummary; }
     public void setStatusSummary(String statusSummary) { this.statusSummary = statusSummary; }
+
+    public int getAhead() { return ahead; }
+    public void setAhead(int ahead) { this.ahead = ahead; }
+
+    public int getBehind() { return behind; }
+    public void setBehind(int behind) { this.behind = behind; }
 
     /** Retorna true se o projeto é utilizável neste PC */
     public boolean isAvailable() {

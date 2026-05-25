@@ -1005,6 +1005,10 @@ public class GitService {
 
         project.setCurrentBranch(getCurrentBranch(project.getPath()));
         project.setStatusSummary(getStatusSummary(project.getPath()));
+
+        Map<String, Object> sync = getSyncStatus(project.getPath());
+        project.setAhead((Integer) sync.getOrDefault("ahead", 0));
+        project.setBehind((Integer) sync.getOrDefault("behind", 0));
     }
 
     // ---- Status detalhado ----
