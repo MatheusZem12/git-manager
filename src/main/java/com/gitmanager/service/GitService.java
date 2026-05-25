@@ -1253,6 +1253,199 @@ public class GitService {
         return sb.toString();
     }
 
+    // ----- Merge & Conflict Resolution -----
+
+    public Map<String, Object> getMergeStatus(String path) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("merging", false);
+        result.put("conflicts", new ArrayList<String>());
+        result.put("sourceBranch", "");
+        result.put("message", "");
+        try (Git git = openGit(path)) {
+            if (git == null) return result;
+            Repository repo = git.getRepository();
+            File mergeHead = new File(repo.getDirectory(), "MERGE_HEAD");
+            if (mergeHead.exists()) {
+                result.put("merging", true);
+                String mergeHeadId = Files.readString(mergeHead.toPath(), StandardCharsets.UTF_8).trim();
+                result.put("mergeHead", mergeHeadId);
+                try (RevWalk walk = new RevWalk(repo)) {
+                    RevCommit commit = walk.parseCommit(repo.resolve(mergeHeadId));
+                    result.put("sourceBranch", commit.getShortMessage());
+                }
+                Status status = git.status().call();
+                List<String> conflicts = new ArrayList<>(status.getConflicting());
+                result.put("conflicts", conflicts);
+            }
+        } catch (Exception e) {
+            log.debug("Erro ao verificar merge status de '{}': {}", path, e.getMessage());
+        }
+        return result;
+    }
+
+    public Map<String, Object> getMergePreview(String path, String source, String target) {
+        Map<String, Object> result = new LinkedHashMap<>();
+        result.put("canMerge", false);
+        result.put("commits", new ArrayList<Map<String, String>>());
+        result.put("filesChanged", 0);
+        result.put("insertions", 0);
+        result.put("deletions", 0);
+        result.put("message", "");
+        try (Git git = openGit(path)) {
+            if (git == null) {
+                result.put("message", "Repositório inacessível.");
+                return result;
+            }
+            Repository repo = git.getRepository();
+            ObjectId sourceId = repo.resolve(source);
+            ObjectId targetId = repo.resolve(target);
+            if (sourceId == null || targetId == null) {
+                result.put("message", "Branch não encontrada.");
+                return result;
+            }
+
+            // Check if already merged
+            try (RevWalk walk = new RevWalk(repo)) {
+                walk.setRevFilter(RevFilter.MERGE_BASE);
+                RevCommit sourceCommit = walk.parseCommit(sourceId);
+                RevCommit targetCommit = walk.parseCommit(targetId);
+                walk.markStart(sourceCommit);
+                walk.markStart(targetCommit);
+                RevCommit mergeBase = walk.next();
+                if (mergeBase != null && mergeBase.getId().equals(targetCommit.getId())) {
+                    result.put("canMerge", true);
+                    result.put("message", "Fast-forward possível.");
+                } else if (mergeBase != null && mergeBase.getId().equals(sourceCommit.getId())) {
+                    result.put("canMerge", false);
+                    result.put("message", "A branch source já está contida no target.");
+                    return result;
+                } else {
+                    result.put("canMerge", true);
+                    result.put("message", "Merge comum.");
+                }
+            }
+
+            // List commits that would be merged
+            List<Map<String, String>> commits = new ArrayList<>();
+            try (RevWalk walk = new RevWalk(repo)) {
+                walk.markStart(walk.parseCommit(sourceId));
+                walk.markUninteresting(walk.parseCommit(targetId));
+                for (RevCommit commit : walk) {
+                    Map<String, String> c = new LinkedHashMap<>();
+                    c.put("id", commit.abbreviate(7).name());
+                    c.put("message", commit.getShortMessage());
+                    c.put("author", commit.getAuthorIdent().getName());
+                    c.put("date", commit.getAuthorIdent().getWhen().toInstant().toString());
+                    commits.add(c);
+                }
+            }
+            result.put("commits", commits);
+
+            // Diff stats
+            try (RevWalk walk = new RevWalk(repo)) {
+                RevCommit sourceCommit = walk.parseCommit(sourceId);
+                RevCommit targetCommit = walk.parseCommit(targetId);
+                CanonicalTreeParser oldTree = new CanonicalTreeParser();
+                oldTree.reset(walk.parseTree(targetCommit.getTree().getId()));
+                CanonicalTreeParser newTree = new CanonicalTreeParser();
+                newTree.reset(walk.parseTree(sourceCommit.getTree().getId()));
+                List<DiffEntry> diffs = git.diff()
+                        .setOldTree(oldTree)
+                        .setNewTree(newTree)
+                        .call();
+                int filesChanged = diffs.size();
+                int insertions = 0;
+                int deletions = 0;
+                for (DiffEntry entry : diffs) {
+                    try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
+                        DiffFormatter formatter = new DiffFormatter(out);
+                        formatter.setRepository(repo);
+                        formatter.format(entry);
+                        String diff = out.toString(StandardCharsets.UTF_8);
+                        for (String line : diff.split("\n")) {
+                            if (line.startsWith("+") && !line.startsWith("+++")) insertions++;
+                            if (line.startsWith("-") && !line.startsWith("---")) deletions++;
+                        }
+                    }
+                }
+                result.put("filesChanged", filesChanged);
+                result.put("insertions", insertions);
+                result.put("deletions", deletions);
+            }
+        } catch (Exception e) {
+            log.error("Erro ao gerar preview de merge de '{}': {}", path, e.getMessage());
+            result.put("message", "Erro: " + e.getMessage());
+        }
+        return result;
+    }
+
+    public String mergeBranch(String path, String source, String target, boolean squash, boolean noFF) {
+        try (Git git = openGit(path)) {
+            if (git == null) return "Repositório inacessível.";
+            Repository repo = git.getRepository();
+            ObjectId sourceId = repo.resolve(source);
+            if (sourceId == null) return "Branch source não encontrada.";
+
+            // Checkout target first
+            git.checkout().setName(target).call();
+
+            MergeCommand merge = git.merge().include(sourceId);
+            if (squash) {
+                merge.setSquash(true);
+            }
+            if (noFF) {
+                merge.setFastForward(MergeCommand.FastForwardMode.NO_FF);
+            } else {
+                merge.setFastForward(MergeCommand.FastForwardMode.FF);
+            }
+            MergeResult result = merge.call();
+            if (result.getMergeStatus().isSuccessful()) {
+                if (result.getMergeStatus() == MergeResult.MergeStatus.FAST_FORWARD) {
+                    return "Merge realizado com sucesso (fast-forward).";
+                } else if (squash) {
+                    return "Squash merge realizado. Faça o commit para finalizar.";
+                }
+                return "Merge realizado com sucesso.";
+            } else if (result.getMergeStatus() == MergeResult.MergeStatus.CONFLICTING) {
+                return "Merge conflitoso. Resolva os conflitos manualmente.";
+            } else {
+                return "Merge falhou: " + result.getMergeStatus().toString();
+            }
+        } catch (Exception e) {
+            log.error("Erro no merge de '{}': {}", path, e.getMessage());
+            return "Erro no merge: " + e.getMessage();
+        }
+    }
+
+    public String abortMerge(String path) {
+        try (Git git = openGit(path)) {
+            if (git == null) return "Repositório inacessível.";
+            git.reset().setMode(ResetCommand.ResetType.HARD).call();
+            return "Merge abortado.";
+        } catch (Exception e) {
+            log.error("Erro ao abortar merge de '{}': {}", path, e.getMessage());
+            return "Erro ao abortar merge: " + e.getMessage();
+        }
+    }
+
+    public String resolveMerge(String path, String message) {
+        try (Git git = openGit(path)) {
+            if (git == null) return "Repositório inacessível.";
+            Status status = git.status().call();
+            if (!status.getConflicting().isEmpty()) {
+                return "Ainda existem conflitos não resolvidos.";
+            }
+            // Stage all resolved files
+            git.add().addFilepattern(".").call();
+            CommitCommand cmd = git.commit().setMessage(message != null && !message.isBlank() ? message : "Merge commit");
+            RevCommit commit = cmd.call();
+            return "Merge resolvido: " + commit.abbreviate(7).name() + " – " + commit.getShortMessage();
+        } catch (Exception e) {
+            log.error("Erro ao resolver merge de '{}': {}", path, e.getMessage());
+            return "Erro ao resolver merge: " + e.getMessage();
+        }
+    }
+
     // ----- Helpers privados -----
 
     private Repository openRepo(String path) {

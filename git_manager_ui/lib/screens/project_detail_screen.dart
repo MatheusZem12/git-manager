@@ -10,6 +10,7 @@ import '../widgets/modern_button.dart';
 import '../widgets/modern_card.dart';
 import '../widgets/modern_dialog.dart';
 import '../widgets/ssh_setup_dialog.dart';
+import 'merge_screen.dart';
 import 'staging_screen.dart';
 import 'timeline_screen.dart';
 
@@ -47,7 +48,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
   @override
   void initState() {
     super.initState();
-    _tabCtrl = TabController(length: 5, vsync: this);
+    _tabCtrl = TabController(length: 6, vsync: this);
     _loadData();
     _refreshStatus();
     _refreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
@@ -288,6 +289,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
             Tab(icon: const Icon(Icons.history, size: 20), text: AppLocalizations.of(context)!.history),
             Tab(icon: const Icon(Icons.label_outline, size: 20), text: AppLocalizations.of(context)!.tags),
             Tab(icon: const Icon(Icons.archive_outlined, size: 20), text: AppLocalizations.of(context)!.stash),
+            Tab(icon: const Icon(Icons.call_merge, size: 20), text: 'Merge'),
           ],
         ),
         Expanded(
@@ -299,6 +301,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
               _buildHistoryTab(),
               _buildTagsTab(),
               _buildStashTab(),
+              _buildMergeTab(),
             ],
           ),
         ),
@@ -339,6 +342,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
             Tab(icon: const Icon(Icons.history, size: 20), text: AppLocalizations.of(context)!.history),
             Tab(icon: const Icon(Icons.label_outline, size: 20), text: AppLocalizations.of(context)!.tags),
             Tab(icon: const Icon(Icons.archive_outlined, size: 20), text: AppLocalizations.of(context)!.stash),
+            Tab(icon: const Icon(Icons.call_merge, size: 20), text: 'Merge'),
           ],
         ),
         actions: [
@@ -361,6 +365,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
           _buildHistoryTab(),
           _buildTagsTab(),
           _buildStashTab(),
+          _buildMergeTab(),
         ],
       ),
     );
@@ -897,6 +902,16 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildMergeTab() {
+    return MergeScreen(
+      path: widget.project.path,
+      api: widget.api,
+      branches: _branches,
+      currentBranch: _currentBranch,
+      onLog: _log,
     );
   }
 

@@ -101,6 +101,13 @@ public class RestServer {
         app.get("/api/git/remotes", this::getRemotes);
         app.post("/api/git/clone", this::doClone);
 
+        // ---------- Merge / PR ----------
+        app.get("/api/git/merge-status", this::getMergeStatus);
+        app.get("/api/git/merge-preview", this::getMergePreview);
+        app.post("/api/git/merge-branch", this::doMergeBranch);
+        app.post("/api/git/merge-abort", this::doAbortMerge);
+        app.post("/api/git/merge-resolve", this::doResolveMerge);
+
         app.start(port);
         System.out.println("Git Manager REST API running on http://localhost:" + port);
     }
@@ -531,5 +538,63 @@ public class RestServer {
     private void doCopySshKey(Context ctx) {
         String result = sshService.copyPublicKeyToClipboard();
         ctx.json(Map.of("result", result));
+    }
+
+    // ---------- Merge / PR ----------
+
+    private void getMergeStatus(Context ctx) {
+        String path = requirePath(ctx);
+        if (path == null) return;
+        ctx.json(gitService.getMergeStatus(path));
+    }
+
+    private void getMergePreview(Context ctx) {
+        String path = requirePath(ctx);
+        String source = ctx.queryParam("source");
+        String target = ctx.queryParam("target");
+        if (path == null || source == null || target == null) {
+            ctx.status(HttpStatus.BAD_REQUEST).json(Map.of("error", "path, source e target são obrigatórios"));
+            return;
+        }
+        ctx.json(gitService.getMergePreview(path, source, target));
+    }
+
+    private void doMergeBranch(Context ctx) {
+        try {
+            Map<String, Object> body = mapper.readValue(ctx.body(), Map.class);
+            String path = (String) body.get("path");
+            String source = (String) body.get("source");
+            String target = (String) body.get("target");
+            boolean squash = Boolean.TRUE.equals(body.get("squash"));
+            boolean noFF = Boolean.TRUE.equals(body.get("noFF"));
+            if (path == null || source == null || target == null) {
+                ctx.status(HttpStatus.BAD_REQUEST).json(Map.of("error", "path, source e target são obrigatórios"));
+                return;
+            }
+            String result = gitService.mergeBranch(path, source, target, squash, noFF);
+            ctx.json(Map.of("result", result));
+        } catch (Exception e) {
+            ctx.status(HttpStatus.BAD_REQUEST).json(Map.of("error", e.getMessage()));
+        }
+    }
+
+    private void doAbortMerge(Context ctx) {
+        try {
+            Map<String, String> body = mapper.readValue(ctx.body(), Map.class);
+            String result = gitService.abortMerge(body.get("path"));
+            ctx.json(Map.of("result", result));
+        } catch (Exception e) {
+            ctx.status(HttpStatus.BAD_REQUEST).json(Map.of("error", e.getMessage()));
+        }
+    }
+
+    private void doResolveMerge(Context ctx) {
+        try {
+            Map<String, String> body = mapper.readValue(ctx.body(), Map.class);
+            String result = gitService.resolveMerge(body.get("path"), body.get("message"));
+            ctx.json(Map.of("result", result));
+        } catch (Exception e) {
+            ctx.status(HttpStatus.BAD_REQUEST).json(Map.of("error", e.getMessage()));
+        }
     }
 }
