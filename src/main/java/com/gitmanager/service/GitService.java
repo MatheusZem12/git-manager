@@ -65,6 +65,7 @@ public class GitService {
                         .setPreferredAuthentications("publickey,keyboard-interactive,password")
                         .setHomeDirectory(FS.DETECTED.userHome())
                         .setSshDirectory(new File(FS.DETECTED.userHome(), ".ssh"))
+                        .withDefaultConnectorFactory()
                         .build(null)
                 );
             }
