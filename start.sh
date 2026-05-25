@@ -9,12 +9,23 @@ API_PORT=18765
 JAR_PATH="$SCRIPT_DIR/target/git-manager-1.0.0.jar"
 FLUTTER_DIR="$SCRIPT_DIR/git_manager_ui"
 FLUTTER_APP="$FLUTTER_DIR/build/linux/x64/release/bundle/git_manager_ui"
-BUILD_MODE="${1:-release}"
+
+BUILD_MODE="release"
+FORCE_REBUILD=false
+
+for arg in "$@"; do
+    case "$arg" in
+        debug) BUILD_MODE="debug" ;;
+        release) BUILD_MODE="release" ;;
+        --rebuild) FORCE_REBUILD=true ;;
+    esac
+done
 
 if [ "$BUILD_MODE" != "release" ] && [ "$BUILD_MODE" != "debug" ]; then
-    echo "Uso: $0 [debug|release]"
-    echo "  debug   - build Flutter em modo debug (mais rápido)"
-    echo "  release - build Flutter em modo release (padrão, mais performance)"
+    echo "Uso: $0 [debug|release] [--rebuild]"
+    echo "  debug       - build Flutter em modo debug (mais rápido)"
+    echo "  release     - build Flutter em modo release (padrão, mais performance)"
+    echo "  --rebuild   - força recompilação completa do Flutter e do backend"
     exit 1
 fi
 
@@ -39,7 +50,12 @@ check_dep flutter
 # Build do backend Java
 echo ""
 echo "🔧 Verificando backend Java..."
-if [ ! -f "$JAR_PATH" ]; then
+if [ "$FORCE_REBUILD" = true ]; then
+    echo "   --rebuild ativo. Recompilando backend..."
+    cd "$SCRIPT_DIR"
+    mvn package -q -DskipTests
+    echo "   ✅ Backend recompilado."
+elif [ ! -f "$JAR_PATH" ]; then
     echo "   JAR não encontrado. Compilando..."
     cd "$SCRIPT_DIR"
     mvn package -q -DskipTests
@@ -60,7 +76,11 @@ echo ""
 echo "🔧 Verificando frontend Flutter..."
 
 NEEDS_BUILD=false
-if [ ! -f "$FLUTTER_APP" ]; then
+if [ "$FORCE_REBUILD" = true ]; then
+    NEEDS_BUILD=true
+    echo "   --rebuild ativo. Forçando recompilação do Flutter..."
+    rm -rf "$FLUTTER_DIR/build/linux"
+elif [ ! -f "$FLUTTER_APP" ]; then
     NEEDS_BUILD=true
     echo "   App Flutter não encontrado."
 else
