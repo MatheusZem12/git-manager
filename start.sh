@@ -110,10 +110,11 @@ else
     echo "   ✅ App Flutter está atualizado."
 fi
 
-# Mata processos antigos na mesma porta
+# Mata processos antigos
 echo ""
 echo "🧹 Limpando processos antigos..."
 lsof -ti:$API_PORT | xargs kill -9 2>/dev/null || true
+killall -9 git_manager_ui 2>/dev/null || true
 
 echo ""
 echo "🚀 Iniciando backend Java na porta $API_PORT..."
