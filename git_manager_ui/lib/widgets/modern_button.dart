@@ -15,7 +15,7 @@ enum ModernButtonVariant {
 class ModernButton extends StatefulWidget {
   final String? label;
   final IconData? icon;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final ModernButtonVariant variant;
   final double scale;
   final bool compact;

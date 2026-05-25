@@ -258,6 +258,29 @@ class ApiService {
     return data['result'];
   }
 
+  Future<Map<String, dynamic>> getMergeStatus(String path) async {
+    return await _get('/git/merge-status', query: {'path': path});
+  }
+
+  Future<Map<String, dynamic>> getMergePreview(String path, String source, String target) async {
+    return await _get('/git/merge-preview', query: {'path': path, 'source': source, 'target': target});
+  }
+
+  Future<String> mergeBranch(String path, String source, String target, {bool squash = false, bool noFF = false}) async {
+    final data = await _post('/git/merge-branch', {'path': path, 'source': source, 'target': target, 'squash': squash, 'noFF': noFF});
+    return data['result'];
+  }
+
+  Future<String> abortMerge(String path) async {
+    final data = await _post('/git/merge-abort', {'path': path});
+    return data['result'];
+  }
+
+  Future<String> resolveMerge(String path, String message) async {
+    final data = await _post('/git/merge-resolve', {'path': path, 'message': message});
+    return data['result'];
+  }
+
   Future<List<Map<String, dynamic>>> getRemotes(String path) async {
     final data = await _get('/git/remotes', query: {'path': path}) as List;
     return data.cast<Map<String, dynamic>>();
