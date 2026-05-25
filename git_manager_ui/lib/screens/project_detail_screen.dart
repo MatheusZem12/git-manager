@@ -135,7 +135,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
       await _loadData();
       if (result.contains('Permission denied') || result.contains('publickey') || result.contains('Cannot log in')) {
         if (mounted) {
-          _log('💡 Dica: configure sua chave SSH clicando no ícone de chave 🔑 no topo.');
+          _log('💡 Dica: configure sua chave SSH clicando no ícone de chave 🔑 no topo da barra lateral.');
         }
       }
     } catch (e) {
