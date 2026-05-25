@@ -267,4 +267,18 @@ class ApiService {
     final data = await _post('/git/clone', {'remoteUrl': remoteUrl, 'localPath': localPath, 'username': username ?? '', 'password': password ?? ''});
     return data['result'];
   }
+
+  Future<Map<String, dynamic>> getSshStatus() async {
+    return await _get('/ssh/status');
+  }
+
+  Future<String> generateSshKey() async {
+    final data = await _post('/ssh/generate', {});
+    return data['result'];
+  }
+
+  Future<String> copySshKey() async {
+    final data = await _post('/ssh/copy', {});
+    return data['result'];
+  }
 }

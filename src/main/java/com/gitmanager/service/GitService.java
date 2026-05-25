@@ -25,7 +25,7 @@ import org.eclipse.jgit.transport.PushResult;
 import org.eclipse.jgit.transport.RemoteRefUpdate;
 import org.eclipse.jgit.transport.SshTransport;
 import org.eclipse.jgit.transport.Transport;
-import org.eclipse.jgit.transport.TransportConfigCallback;
+import org.eclipse.jgit.api.TransportConfigCallback;
 import org.eclipse.jgit.transport.URIish;
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider;
 import org.eclipse.jgit.transport.sshd.SshdSessionFactoryBuilder;
@@ -829,7 +829,7 @@ public class GitService {
             } else {
                 return "Merge conflitoso. Resolva os conflitos manualmente.";
             }
-        } catch (GitAPIException e) {
+        } catch (Exception e) {
             log.error("Erro no merge de '{}': {}", path, e.getMessage());
             return "Erro no merge: " + e.getMessage();
         }
@@ -846,7 +846,7 @@ public class GitService {
             } else {
                 return "Cherry-pick conflitoso. Resolva os conflitos manualmente.";
             }
-        } catch (GitAPIException e) {
+        } catch (Exception e) {
             log.error("Erro no cherry-pick de '{}': {}", path, e.getMessage());
             return "Erro no cherry-pick: " + e.getMessage();
         }
