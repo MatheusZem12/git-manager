@@ -191,6 +191,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final l10n = AppLocalizations.of(context)!;
     final available = _projects.where((p) => p.isAvailable).length;
     final unavailable = _projects.length - available;
+    final withChanges = _projects.where((p) {
+      if (!p.isAvailable) return false;
+      final hasLocalChanges = p.statusSummary != 'Limpo';
+      final outOfSync = p.ahead > 0 || p.behind > 0;
+      return hasLocalChanges || outOfSync;
+    }).length;
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -201,6 +207,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           l10n: l10n,
           available: available,
           unavailable: unavailable,
+          withChanges: withChanges,
           compact: isCompact,
         );
 
@@ -298,6 +305,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     required AppLocalizations l10n,
     required int available,
     required int unavailable,
+    required int withChanges,
     required bool compact,
   }) {
     final s = Responsive.sidebarScale(_sidebarWidth);
@@ -414,6 +422,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 children: [
                   _statItem(_projects.length.toString(), l10n.total, AppTheme.text, s),
                   _statItem(available.toString(), l10n.ok, AppTheme.success, s),
+                  _statItem(withChanges.toString(), l10n.withChanges, withChanges > 0 ? AppTheme.warning : AppTheme.textMuted, s),
                   _statItem(unavailable.toString(), l10n.unavailable, unavailable > 0 ? AppTheme.danger : AppTheme.textMuted, s),
                 ],
               ),
@@ -583,6 +592,9 @@ class _ProjectCard extends StatelessWidget {
     if (!project.isAvailable) return StatusBadge.error(tooltip: 'Unavailable');
     if (!project.existsOnDisk) return StatusBadge.error(tooltip: 'Not found');
     if (!project.hasGit) return StatusBadge.warn(tooltip: 'No git');
+    final bool hasLocalChanges = project.statusSummary != 'Limpo';
+    final bool outOfSync = project.ahead > 0 || project.behind > 0;
+    if (hasLocalChanges || outOfSync) return StatusBadge.warn(tooltip: 'Has changes');
     return StatusBadge.ok();
   }
 
