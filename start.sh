@@ -97,6 +97,11 @@ fi
 if [ "$NEEDS_BUILD" = true ]; then
     echo "   Compilando Flutter em modo $BUILD_MODE..."
     cd "$FLUTTER_DIR"
+    if [ "$FORCE_REBUILD" = true ]; then
+        echo "   Limpando caches do Flutter..."
+        flutter clean > /dev/null 2>&1 || true
+        rm -rf .dart_tool/build
+    fi
     flutter config --enable-linux-desktop > /dev/null 2>&1 || true
     flutter pub get > /dev/null 2>&1 || true
     flutter build linux --"$BUILD_MODE"

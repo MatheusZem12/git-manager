@@ -343,7 +343,7 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.vpn_key_outlined),
+            icon: const Icon(Icons.vpn_key),
             onPressed: () => SshSetupDialog.show(context, widget.api),
             tooltip: 'Configurar SSH',
           ),
