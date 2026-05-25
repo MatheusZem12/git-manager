@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_gen/gen_l10n/app_localizations.dart';
 import '../models/git_project.dart';
 import '../services/api_service.dart';
@@ -581,6 +582,13 @@ class _ProjectDetailScreenState extends State<ProjectDetailScreen>
                     children: [
                       _sectionTitle(Icons.terminal, AppLocalizations.of(context)!.output),
                       const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.copy, size: 18, color: AppTheme.textMuted),
+                        tooltip: AppLocalizations.of(context)!.copy,
+                        onPressed: () {
+                          Clipboard.setData(ClipboardData(text: _outputCtrl.text));
+                        },
+                      ),
                       TextButton(
                         onPressed: () => _outputCtrl.clear(),
                         child: Text(AppLocalizations.of(context)!.clear),
