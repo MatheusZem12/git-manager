@@ -11,6 +11,7 @@ import '../widgets/glass_container.dart';
 import '../widgets/modern_button.dart';
 import '../widgets/modern_dialog.dart';
 import '../widgets/language_selector.dart';
+import '../widgets/ssh_setup_dialog.dart';
 import 'project_detail_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
@@ -236,6 +237,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 ),
                 const SizedBox(width: 8),
                 IconButton(
+                  icon: const Icon(Icons.key, color: AppTheme.textMuted),
+                  onPressed: () => SshSetupDialog.show(context, _api),
+                  tooltip: 'Configurar chave SSH',
+                ),
+                const SizedBox(width: 8),
+                IconButton(
                   icon: const Icon(Icons.refresh, color: AppTheme.textMuted),
                   onPressed: _loadProjects,
                   tooltip: l10n.refresh,
@@ -364,6 +371,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       LanguageSelector(
                         currentLocale: widget.locale,
                         onChanged: widget.onLocaleChange,
+                      ),
+                      SizedBox(width: Responsive.pad(6, s)),
+                      IconButton(
+                        icon: Icon(
+                          Icons.key,
+                          color: AppTheme.textMuted,
+                          size: Responsive.icon(18, s),
+                        ),
+                        onPressed: () => SshSetupDialog.show(context, _api),
+                        tooltip: 'Configurar chave SSH',
                       ),
                       SizedBox(width: Responsive.pad(6, s)),
                       IconButton(
