@@ -379,7 +379,10 @@ class _StagingScreenState extends State<StagingScreen> {
                     ),
                   ),
                   SizedBox(width: Responsive.pad(6, s)),
-                  _CommitButton(scale: s, onPressed: _doCommit),
+                  _CommitButton(
+                      scale: s,
+                      stagedCount: staged.length,
+                      onPressed: _doCommit),
                 ],
               ),
             ),
@@ -773,16 +776,19 @@ class _FileSection extends StatelessWidget {
 class _CommitButton extends StatelessWidget {
   final VoidCallback onPressed;
   final double scale;
-  const _CommitButton({required this.onPressed, required this.scale});
+  final int stagedCount;
+  const _CommitButton(
+      {required this.onPressed, required this.scale, required this.stagedCount});
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
-    return Material(
-      color: AppTheme.success,
+    final enabled = stagedCount > 0;
+    final button = Material(
+      color: enabled ? AppTheme.success : AppTheme.success.withValues(alpha: 0.4),
       borderRadius: BorderRadius.circular(6),
       child: InkWell(
-        onTap: onPressed,
+        onTap: enabled ? onPressed : null,
         borderRadius: BorderRadius.circular(6),
         child: Padding(
           padding: EdgeInsets.symmetric(
@@ -792,17 +798,23 @@ class _CommitButton extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.check_rounded,
-                  color: Colors.white, size: Responsive.icon(14, scale)),
+                  color: enabled ? Colors.white : Colors.white.withValues(alpha: 0.6),
+                  size: Responsive.icon(14, scale)),
               SizedBox(width: Responsive.pad(3, scale)),
               Text(l10n.commit,
                   style: TextStyle(
-                      color: Colors.white,
+                      color: enabled ? Colors.white : Colors.white.withValues(alpha: 0.6),
                       fontSize: Responsive.font(12, scale),
                       fontWeight: FontWeight.w600)),
             ],
           ),
         ),
       ),
+    );
+    if (enabled) return button;
+    return Tooltip(
+      message: l10n.commitButtonTooltipNoStagedFiles,
+      child: button,
     );
   }
 }

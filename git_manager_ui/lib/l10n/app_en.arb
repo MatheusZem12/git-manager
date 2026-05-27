@@ -238,5 +238,6 @@
   "nothingToPull": "Nothing to pull",
   "upToDate": "Up to date",
   "copy": "Copy",
-  "comingSoon": "Coming soon"
+  "comingSoon": "Coming soon",
+  "commitButtonTooltipNoStagedFiles": "Add files to stage to be able to commit"
 }

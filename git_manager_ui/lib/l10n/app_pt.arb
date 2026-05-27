@@ -238,5 +238,6 @@
   "nothingToPull": "Nada para baixar",
   "upToDate": "Atualizado",
   "copy": "Copiar",
-  "comingSoon": "Em breve"
+  "comingSoon": "Em breve",
+  "commitButtonTooltipNoStagedFiles": "Adicione arquivos ao stage para poder commitar"
 }
