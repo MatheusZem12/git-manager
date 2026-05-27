@@ -17,6 +17,7 @@ import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.*;
 import org.eclipse.jgit.revwalk.RevCommit;
 import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.revwalk.filter.RevFilter;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 import org.eclipse.jgit.transport.CredentialItem;
 import org.eclipse.jgit.transport.CredentialsProvider;
@@ -1346,9 +1347,9 @@ public class GitService {
                 RevCommit sourceCommit = walk.parseCommit(sourceId);
                 RevCommit targetCommit = walk.parseCommit(targetId);
                 CanonicalTreeParser oldTree = new CanonicalTreeParser();
-                oldTree.reset(walk.parseTree(targetCommit.getTree().getId()));
+                oldTree.reset(repo.newObjectReader(), targetCommit.getTree().getId());
                 CanonicalTreeParser newTree = new CanonicalTreeParser();
-                newTree.reset(walk.parseTree(sourceCommit.getTree().getId()));
+                newTree.reset(repo.newObjectReader(), sourceCommit.getTree().getId());
                 List<DiffEntry> diffs = git.diff()
                         .setOldTree(oldTree)
                         .setNewTree(newTree)
