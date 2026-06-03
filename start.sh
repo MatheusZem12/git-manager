@@ -6,9 +6,10 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 API_PORT=18765
-JAR_PATH="$SCRIPT_DIR/target/git-manager-1.0.0.jar"
-FLUTTER_DIR="$SCRIPT_DIR/git_manager_ui"
-FLUTTER_APP="$FLUTTER_DIR/build/linux/x64/release/bundle/git_manager_ui"
+BACKEND_DIR="$SCRIPT_DIR/backend"
+FRONTEND_DIR="$SCRIPT_DIR/frontend"
+JAR_PATH="$BACKEND_DIR/target/git-manager-1.0.0.jar"
+FLUTTER_APP="$FRONTEND_DIR/build/linux/x64/release/bundle/git_manager_ui"
 
 BUILD_MODE="release"
 FORCE_REBUILD=false
@@ -52,12 +53,12 @@ echo ""
 echo "🔧 Verificando backend Java..."
 if [ "$FORCE_REBUILD" = true ]; then
     echo "   --rebuild ativo. Recompilando backend..."
-    cd "$SCRIPT_DIR"
+    cd "$BACKEND_DIR"
     mvn package -q -DskipTests
     echo "   ✅ Backend recompilado."
 elif [ ! -f "$JAR_PATH" ]; then
     echo "   JAR não encontrado. Compilando..."
-    cd "$SCRIPT_DIR"
+    cd "$BACKEND_DIR"
     mvn package -q -DskipTests
     echo "   ✅ Backend compilado."
 else
@@ -66,9 +67,9 @@ fi
 
 # Ajusta caminho do app baseado no modo
 if [ "$BUILD_MODE" = "debug" ]; then
-    FLUTTER_APP="$FLUTTER_DIR/build/linux/x64/debug/bundle/git_manager_ui"
+    FLUTTER_APP="$FRONTEND_DIR/build/linux/x64/debug/bundle/git_manager_ui"
 else
-    FLUTTER_APP="$FLUTTER_DIR/build/linux/x64/release/bundle/git_manager_ui"
+    FLUTTER_APP="$FRONTEND_DIR/build/linux/x64/release/bundle/git_manager_ui"
 fi
 
 # Build do Flutter
@@ -79,13 +80,13 @@ NEEDS_BUILD=false
 if [ "$FORCE_REBUILD" = true ]; then
     NEEDS_BUILD=true
     echo "   --rebuild ativo. Forçando recompilação do Flutter..."
-    rm -rf "$FLUTTER_DIR/build/linux"
+    rm -rf "$FRONTEND_DIR/build/linux"
 elif [ ! -f "$FLUTTER_APP" ]; then
     NEEDS_BUILD=true
     echo "   App Flutter não encontrado."
 else
     # Verifica se algum arquivo .dart foi modificado depois do build
-    LATEST_DART=$(find "$FLUTTER_DIR/lib" -name "*.dart" -type f -printf '%T@\n' 2>/dev/null | sort -n | tail -1)
+    LATEST_DART=$(find "$FRONTEND_DIR/lib" -name "*.dart" -type f -printf '%T@\n' 2>/dev/null | sort -n | tail -1)
     BUILD_TIME=$(stat -c %Y "$FLUTTER_APP" 2>/dev/null || echo 0)
     
     if [ -n "$LATEST_DART" ] && [ "${LATEST_DART%.*}" -gt "$BUILD_TIME" ]; then
@@ -96,7 +97,7 @@ fi
 
 if [ "$NEEDS_BUILD" = true ]; then
     echo "   Compilando Flutter em modo $BUILD_MODE..."
-    cd "$FLUTTER_DIR"
+    cd "$FRONTEND_DIR"
     if [ "$FORCE_REBUILD" = true ]; then
         echo "   Limpando caches do Flutter..."
         flutter clean > /dev/null 2>&1 || true
