@@ -45,26 +45,27 @@ O script `start.sh` compila tudo automaticamente, inicia o backend Java e depois
 **1. Compile o backend Java:**
 
 ```bash
+cd backend
 mvn package -DskipTests
 ```
 
 **2. Compile o app Flutter (Linux):**
 
 ```bash
-cd git_manager_ui
+cd frontend
 flutter build linux --debug
 ```
 
 **3. Inicie o backend:**
 
 ```bash
-java -cp target/git-manager-1.0.0.jar com.gitmanager.ApiMain
+java -cp backend/target/git-manager-1.0.0.jar com.gitmanager.ApiMain
 ```
 
 **4. Em outro terminal, inicie o Flutter:**
 
 ```bash
-./git_manager_ui/build/linux/x64/debug/bundle/git_manager_ui
+./frontend/build/linux/x64/debug/bundle/git_manager_ui
 ```
 
 ## Funcionalidades
@@ -111,17 +112,18 @@ java -cp target/git-manager-1.0.0.jar com.gitmanager.ApiMain
 ## Estrutura do projeto
 
 ```
-├── pom.xml                          # Build Maven (Java backend)
 ├── start.sh                         # Launcher automático
-├── src/main/java/com/gitmanager/
-│   ├── ApiMain.java                 # Entry point do servidor REST
-│   ├── api/
-│   │   └── RestServer.java          # API Javalin (endpoints REST)
-│   ├── model/                       # Entidades (GitProject, GitCommit, etc.)
-│   ├── service/                     # Regra de negócio (GitService, ProjectService)
-│   └── ui/                          # UI antiga JavaFX (mantida para compatibilidade)
+├── backend/                         # Backend Java
+│   ├── pom.xml                      # Build Maven
+│   └── src/main/java/com/gitmanager/
+│       ├── ApiMain.java             # Entry point do servidor REST
+│       ├── api/
+│       │   └── RestServer.java      # API Javalin (endpoints REST)
+│       ├── model/                   # Entidades (GitProject, GitCommit, etc.)
+│       ├── service/                 # Regra de negócio (GitService, ProjectService)
+│       └── ui/                      # UI antiga JavaFX (mantida para compatibilidade)
 │
-└── git_manager_ui/                  # Projeto Flutter Desktop
+└── frontend/                        # Projeto Flutter Desktop
     ├── lib/
     │   ├── main.dart                # Entry point Flutter
     │   ├── theme.dart               # Tema escuro moderno
