@@ -1,0 +1,18 @@
+{
+  "name": "git-manager",
+  "version": "2.0.0",
+  "description": "Gerenciador local de repositórios Git com Electron e Node.js",
+  "main": "electron.js",
+  "scripts": {
+    "start": "GTK_USE_PORTAL=0 electron --ozone-platform=x11 --xdg-portal-required-version=5 .",
+    "dev": "GTK_USE_PORTAL=0 electron --ozone-platform=x11 --xdg-portal-required-version=5 . --dev"
+  },
+  "author": "Matheus <matheuslajazem@gmail.com>",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^33.0.0"
+  },
+  "dependencies": {
+    "simple-git": "^3.27.0"
+  }
+}

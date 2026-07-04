@@ -1,156 +1,83 @@
 # Git Manager
 
-Gerenciador local de repositórios Git com interface gráfica moderna em **Flutter Desktop** e backend **Java REST**.
+Gerenciador local de repositórios Git com **Electron + Node.js**. Um único processo, sem API REST, sem backend separado: a UI fala direto com o Git do seu sistema através do módulo principal do Electron.
 
-## Tecnologias
+## Como funciona
 
-- **Flutter 3.27** — Interface desktop moderna (Material 3, dark theme, animações)
-- **Dart** — Cliente HTTP consumindo API REST
-- **Java 17** — Backend e regra de negócio
-- **Javalin 6** — Servidor REST embutido
-- **JGit** — Operações Git programáticas
-- **Jackson** — Serialização JSON
-- **Maven** — Build do backend Java
+1. Você cadastra repositórios já existentes no disco (seleção de pastas, pode adicionar várias de uma vez).
+2. O dashboard mostra todos os projetos agrupados, com busca, estatísticas e status (limpo / com alterações / indisponível) de cada um.
+3. Ao selecionar um projeto, você tem abas para: visão geral (branch, sync, push/pull/fetch), commit (stage/unstage com diff colorido), histórico, tags e stash.
 
-## Arquitetura
+Se você já usava a versão antiga (Java + Flutter), seus repositórios cadastrados em `~/.git-manager/repos.txt` são **migrados automaticamente** na primeira execução — nada precisa ser recadastrado.
+
+## Requisitos
+
+- Node.js 18+
+- npm 9+
+- `git` instalado e no PATH (o app usa o binário do sistema — herda sua configuração de SSH, credenciais e `~/.gitconfig` normalmente)
+
+## Estrutura do projeto
+
+- `source/` — todo o código do app (Electron + Node.js)
+- `README.md`, `start.sh` — documentação e script, na raiz
 
 ```
-┌─────────────────────┐      HTTP REST       ┌─────────────────────┐
-│   Flutter Desktop   │ ◄──────────────────► │   Java Backend      │
-│   (UI Moderna)      │   localhost:18765    │   (Regra de Negócio)│
-└─────────────────────┘                      └─────────────────────┘
+source/
+├── electron.js              # Entry point do processo principal
+├── preload.js                # Ponte segura entre main e renderer
+├── src/
+│   ├── main/
+│   │   ├── ipc-handlers.js   # Registro central dos handlers IPC
+│   │   ├── git/
+│   │   │   └── git-service.js    # Todas as operações Git (via simple-git)
+│   │   └── storage/
+│   │       └── project-store.js  # Persistência dos projetos cadastrados
+│   └── renderer/
+│       ├── index.html
+│       ├── styles.css
+│       ├── app.js
+│       ├── screens/
+│       │   ├── dashboard-screen.js       # Sidebar: lista, busca, grupos
+│       │   ├── project-detail-screen.js  # Abas: visão geral, histórico, tags, stash
+│       │   └── staging-tab.js            # Aba de commit: stage/unstage + diff
+│       └── services/
+│           ├── git-api.js    # Wrapper fino sobre window.gitManagerAPI
+│           ├── dialogs.js    # Diálogos de confirmação/input
+│           └── toast.js      # Notificações
 ```
 
-O **Java** continua como regra de negócio (GitService, ProjectService, models).  
-O **Flutter** substituiu a UI JavaFX antiga, consumindo operações via API REST local.
-
-## Pré-requisitos
-
-- Java 17+
-- Maven 3.8+
-- Flutter 3.27+ (com Linux desktop enabled)
-
-## Executar
-
-### Opção rápida (script automático)
+## Como executar
 
 ```bash
-./start.sh
-```
-
-O script `start.sh` compila tudo automaticamente, inicia o backend Java e depois o app Flutter.
-
-### Manualmente
-
-**1. Compile o backend Java:**
-
-```bash
-cd backend
-mvn package -DskipTests
-```
-
-**2. Compile o app Flutter (Linux):**
-
-```bash
-cd frontend
-flutter build linux --debug
-```
-
-**3. Inicie o backend:**
-
-```bash
-java -cp backend/target/git-manager-1.0.0.jar com.gitmanager.ApiMain
-```
-
-**4. Em outro terminal, inicie o Flutter:**
-
-```bash
-./frontend/build/linux/x64/debug/bundle/git_manager_ui
+cd source
+npm install
+npm start        # ou ./start.sh (na raiz do projeto)
 ```
 
 ## Funcionalidades
 
-### Interface Flutter Moderna
-- **Tema escuro premium** — inspirado em Linear/GitHub Dark, com glassmorphism, cards elevados e sombras
-- **Dashboard** — lista de repositórios em cards com indicadores de status, busca em tempo real e estatísticas
-- **Detalhes do projeto** — abas para Visão Geral, Histórico, Tags e Stash
-- **Staging visual** — lista de arquivos alterados com checkboxes, preview de diff e commit integrado
-- **Timeline gráfica** — visualização de commits com branches coloridas e conexões
-- **Animações** — transições suaves, hover effects e glow nos elementos
+- Cadastro de repositórios (múltiplos de uma vez), agrupamento livre, busca por nome ou caminho
+- Dashboard com estatísticas (total / OK / com alterações / indisponível)
+- Visão geral: branch atual, HEAD, troca de branch, nova branch, push/pull/fetch com log de saída
+- Commit: stage/unstage individual ou em lote, diff unificado colorido (linhas adicionadas/removidas), visualização do arquivo completo, commit dos arquivos staged
+- Histórico simples de commits da branch atual
+- Tags: criar (anotada se tiver mensagem, leve se não) e excluir
+- Stash: salvar, aplicar, pop, listar
 
-### Operações Git (via JGit no backend)
-- **Commit** — selecionar arquivos e mensagem
-- **Push / Pull / Fetch** — com suporte a credenciais
-- **Checkout / Nova branch**
-- **Tags** — criar e listar
-- **Stash** — save, pop, apply
-- **Histórico** — lista e gráfico de commits
+### Fora do escopo desta versão
 
-## API REST Endpoints
+Para manter a reescrita enxuta, ficaram de fora (podem ser adicionados depois, se fizerem falta):
 
-| Método | Endpoint | Descrição |
-|--------|----------|-----------|
-| GET | `/api/health` | Health check |
-| GET | `/api/projects` | Listar projetos |
-| POST | `/api/projects` | Adicionar projeto |
-| PUT | `/api/projects` | Atualizar projeto |
-| DELETE | `/api/projects` | Remover projeto |
-| GET | `/api/git/status` | Status do repo |
-| GET | `/api/git/branches` | Listar branches |
-| GET | `/api/git/commits` | Commits recentes |
-| GET | `/api/git/graph` | Grafo de commits |
-| GET | `/api/git/changes` | Arquivos alterados |
-| POST | `/api/git/commit` | Fazer commit |
-| POST | `/api/git/push` | Push |
-| POST | `/api/git/pull` | Pull |
-| POST | `/api/git/fetch` | Fetch |
-| POST | `/api/git/checkout` | Checkout |
-| POST | `/api/git/create-branch` | Nova branch |
-| POST | `/api/git/create-tag` | Nova tag |
-| POST | `/api/git/stash-*` | Operações stash |
-
-## Estrutura do projeto
-
-```
-├── start.sh                         # Launcher automático
-├── backend/                         # Backend Java
-│   ├── pom.xml                      # Build Maven
-│   └── src/main/java/com/gitmanager/
-│       ├── ApiMain.java             # Entry point do servidor REST
-│       ├── api/
-│       │   └── RestServer.java      # API Javalin (endpoints REST)
-│       ├── model/                   # Entidades (GitProject, GitCommit, etc.)
-│       ├── service/                 # Regra de negócio (GitService, ProjectService)
-│       └── ui/                      # UI antiga JavaFX (mantida para compatibilidade)
-│
-└── frontend/                        # Projeto Flutter Desktop
-    ├── lib/
-    │   ├── main.dart                # Entry point Flutter
-    │   ├── theme.dart               # Tema escuro moderno
-    │   ├── models/                  # Modelos Dart
-    │   ├── services/
-    │   │   └── api_service.dart     # Cliente HTTP para Java REST
-    │   ├── screens/
-    │   │   ├── dashboard_screen.dart
-    │   │   ├── project_detail_screen.dart
-    │   │   ├── staging_screen.dart
-    │   │   └── timeline_screen.dart
-    │   └── widgets/                 # Componentes reutilizáveis
-    └── linux/                       # Build Linux desktop
-```
+- Timeline gráfica com branches coloridas (o histórico existe, mas como lista simples)
+- Tela de merge/PR-like (merge preview, squash, resolução de conflitos assistida)
+- Wizard de configuração de SSH (o push/pull/fetch funciona normalmente usando a configuração de SSH já existente no seu sistema)
+- Internacionalização (só português)
 
 ## Persistência
 
-Os diretórios cadastrados são salvos em:
+Os projetos cadastrados ficam em um JSON na pasta de dados do usuário (`userData` do Electron) — não em `~/.git-manager/repos.txt` (esse arquivo só é lido uma vez, para migração, e nunca mais é tocado).
 
-```
-~/.git-manager/repos.txt
-```
+## Notas técnicas
 
-Formato: `nome|caminho|notas`
-
-## Notas
-
-- O backend REST roda na porta **18765** (localhost apenas).
-- O Flutter se comunica com o Java via HTTP — não há dependência direta de código.
-- A UI JavaFX antiga ainda está presente em `src/main/java/com/gitmanager/ui/` mas não é mais usada como entry point principal.
+- Operações Git usam a lib [`simple-git`](https://www.npmjs.com/package/simple-git), que executa o binário `git` do sistema — SSH, credenciais e configurações globais funcionam exatamente como na linha de comando.
+- Delete de branch é seguro por padrão (recusa branches não mescladas); force-delete existe na camada de serviço mas não tem UI dedicada ainda.
