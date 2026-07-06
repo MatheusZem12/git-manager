@@ -25,6 +25,21 @@ function isSelfOrDescendant(groups, ancestorId, nodeId) {
   return false;
 }
 
+function normalizeName(name) {
+  return (name || '').trim().toLowerCase();
+}
+
+// true se já existe outro grupo com esse nome sob o mesmo pai (comparação sem
+// diferenciar maiúsculas/minúsculas). `exceptId` ignora o próprio grupo (usado
+// ao renomear). Nomes iguais são permitidos em pais diferentes.
+function siblingNameTaken(groups, parentId, name, exceptId = null) {
+  const target = normalizeName(name);
+  const pid = parentId || null;
+  return groups.some(
+    (g) => g.id !== exceptId && (g.parentId || null) === pid && normalizeName(g.name) === target
+  );
+}
+
 function createGroupStore(storeFilePath) {
   function load() {
     if (!fs.existsSync(storeFilePath)) return [];
@@ -45,10 +60,14 @@ function createGroupStore(storeFilePath) {
     const finalName = (name || '').trim();
     if (!finalName) throw new Error('O nome do grupo não pode ser vazio.');
     const groups = load();
-    if (parentId && !groups.some((g) => g.id === parentId)) {
+    const pid = parentId || null;
+    if (pid && !groups.some((g) => g.id === pid)) {
       throw new Error('Grupo pai não encontrado.');
     }
-    const group = { id: genId(), name: finalName, parentId: parentId || null };
+    if (siblingNameTaken(groups, pid, finalName)) {
+      throw new Error(`Já existe um grupo chamado "${finalName}" aqui.`);
+    }
+    const group = { id: genId(), name: finalName, parentId: pid };
     groups.push(group);
     save(groups);
     return group;
@@ -60,6 +79,9 @@ function createGroupStore(storeFilePath) {
     const groups = load();
     const group = groups.find((g) => g.id === id);
     if (!group) throw new Error('Grupo não encontrado.');
+    if (siblingNameTaken(groups, group.parentId || null, finalName, id)) {
+      throw new Error(`Já existe um grupo chamado "${finalName}" aqui.`);
+    }
     group.name = finalName;
     save(groups);
     return group;
@@ -69,15 +91,20 @@ function createGroupStore(storeFilePath) {
     const groups = load();
     const group = groups.find((g) => g.id === id);
     if (!group) throw new Error('Grupo não encontrado.');
-    if (parentId) {
-      if (!groups.some((g) => g.id === parentId)) throw new Error('Grupo pai não encontrado.');
+    const pid = parentId || null;
+    if (pid) {
+      if (!groups.some((g) => g.id === pid)) throw new Error('Grupo pai não encontrado.');
       // Impede criar ciclos (mover um grupo pra dentro de si mesmo ou de um
       // descendente seu).
-      if (isSelfOrDescendant(groups, id, parentId)) {
+      if (isSelfOrDescendant(groups, id, pid)) {
         throw new Error('Não é possível mover um grupo para dentro de si mesmo.');
       }
     }
-    group.parentId = parentId || null;
+    // Mover para um pai que já tem um filho com o mesmo nome criaria duplicata.
+    if (siblingNameTaken(groups, pid, group.name, id)) {
+      throw new Error(`Já existe um grupo chamado "${group.name}" no destino.`);
+    }
+    group.parentId = pid;
     save(groups);
     return group;
   }
