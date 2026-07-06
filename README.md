@@ -5,8 +5,8 @@ Gerenciador local de repositórios Git com **Electron + Node.js**. Um único pro
 ## Como funciona
 
 1. Você cadastra repositórios já existentes no disco (seleção de pastas, pode adicionar várias de uma vez).
-2. O dashboard mostra todos os projetos agrupados, com busca, estatísticas e status (limpo / com alterações / indisponível) de cada um.
-3. Ao selecionar um projeto, você tem abas para: visão geral (branch, sync, push/pull/fetch), commit (stage/unstage com diff colorido), histórico, tags e stash.
+2. O dashboard mostra os projetos organizados em **grupos e subgrupos** — arraste repositórios e grupos para reorganizar — com busca, estatísticas e status (limpo / com alterações / indisponível) de cada um.
+3. Ao selecionar um projeto, você tem abas para: visão geral (branch, sync, push/pull/fetch), commit (stage/unstage com diff colorido), histórico (em gráfico de branches ou lista), tags e stash. Cada repositório também pode ser renomeado ou removido direto pelo cartão.
 
 Se você já usava a versão antiga (Java + Flutter), seus repositórios cadastrados em `~/.git-manager/repos.txt` são **migrados automaticamente** na primeira execução — nada precisa ser recadastrado.
 
@@ -19,7 +19,7 @@ Se você já usava a versão antiga (Java + Flutter), seus repositórios cadastr
 ## Estrutura do projeto
 
 - `source/` — todo o código do app (Electron + Node.js)
-- `README.md`, `start.sh` — documentação e script, na raiz
+- `README.md`, `start.sh`, `install-desktop.sh` — documentação e scripts, na raiz
 
 ```
 source/
@@ -31,14 +31,15 @@ source/
 │   │   ├── git/
 │   │   │   └── git-service.js    # Todas as operações Git (via simple-git)
 │   │   └── storage/
-│   │       └── project-store.js  # Persistência dos projetos cadastrados
+│   │       ├── project-store.js  # Persistência dos projetos cadastrados
+│   │       └── group-store.js    # Grupos e subgrupos (hierárquicos)
 │   └── renderer/
 │       ├── index.html
 │       ├── styles.css
 │       ├── app.js
 │       ├── screens/
-│       │   ├── dashboard-screen.js       # Sidebar: lista, busca, grupos
-│       │   ├── project-detail-screen.js  # Abas: visão geral, histórico, tags, stash
+│       │   ├── dashboard-screen.js       # Sidebar: lista, busca, grupos aninhados, drag & drop
+│       │   ├── project-detail-screen.js  # Abas: visão geral, histórico (gráfico/lista), tags, stash
 │       │   └── staging-tab.js            # Aba de commit: stage/unstage + diff
 │       └── services/
 │           ├── git-api.js    # Wrapper fino sobre window.gitManagerAPI
@@ -54,13 +55,23 @@ npm install
 npm start        # ou ./start.sh (na raiz do projeto)
 ```
 
+### Instalar como app do desktop (Linux)
+
+Para criar um atalho no menu de aplicativos, com ícone:
+
+```bash
+./install-desktop.sh              # instala/atualiza o atalho
+./install-desktop.sh --uninstall  # remove
+```
+
 ## Funcionalidades
 
-- Cadastro de repositórios (múltiplos de uma vez), agrupamento livre, busca por nome ou caminho
+- Cadastro de repositórios (múltiplos de uma vez), organização em **grupos e subgrupos** (aninhados) com **arrastar-e-soltar** para mover repositórios e grupos, e busca por nome ou caminho
+- Renomear e remover repositórios direto pelo cartão
 - Dashboard com estatísticas (total / OK / com alterações / indisponível)
 - Visão geral: branch atual, HEAD, troca de branch, nova branch, push/pull/fetch com log de saída
 - Commit: stage/unstage individual ou em lote, diff unificado colorido (linhas adicionadas/removidas), visualização do arquivo completo, commit dos arquivos staged
-- Histórico simples de commits da branch atual
+- Histórico da branch em duas visões: **gráfico de commits** (lanes coloridas mostrando branches e merges) ou lista
 - Tags: criar (anotada se tiver mensagem, leve se não) e excluir
 - Stash: salvar, aplicar, pop, listar
 
@@ -68,7 +79,6 @@ npm start        # ou ./start.sh (na raiz do projeto)
 
 Para manter a reescrita enxuta, ficaram de fora (podem ser adicionados depois, se fizerem falta):
 
-- Timeline gráfica com branches coloridas (o histórico existe, mas como lista simples)
 - Tela de merge/PR-like (merge preview, squash, resolução de conflitos assistida)
 - Wizard de configuração de SSH (o push/pull/fetch funciona normalmente usando a configuração de SSH já existente no seu sistema)
 - Internacionalização (só português)
