@@ -1,14 +1,19 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, Menu } = require('electron');
 const path = require('path');
 const { registerIpcHandlers } = require('./src/main/ipc-handlers');
+
+// Remove a barra de menu nativa (File/Edit/View/...). O app tem UI própria.
+Menu.setApplicationMenu(null);
 
 function createWindow() {
   const mainWindow = new BrowserWindow({
     width: 1400,
     height: 860,
-    minWidth: 900,
-    minHeight: 600,
+    minWidth: 680,
+    minHeight: 480,
     backgroundColor: '#0D0F12',
+    autoHideMenuBar: true,
+    icon: path.join(__dirname, 'assets', 'icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,

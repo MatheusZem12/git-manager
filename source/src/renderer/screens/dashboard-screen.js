@@ -22,12 +22,6 @@ function statusClass(p) {
   return 'ok';
 }
 
-function shortPath(fullPath) {
-  const segments = fullPath.split('/').filter(Boolean);
-  if (segments.length <= 2) return fullPath;
-  return '../' + segments.slice(-2).join('/');
-}
-
 function matchesSearch(p) {
   if (!searchQuery) return true;
   const q = searchQuery.toLowerCase();
@@ -42,7 +36,13 @@ function escapeHtml(s) {
 }
 
 export async function renderSidebar(container, { selectedPath, onSelect, onRemoved }) {
-  container.innerHTML = `<div class="empty-state">Carregando...</div>`;
+  // Preserva a posição de scroll da lista entre re-renders (ex: ao atualizar).
+  const prevScroll = container.querySelector('.project-list')?.scrollTop || 0;
+  // "Carregando..." só no primeiro load. Nos refreshes seguintes mantemos o
+  // conteúdo atual visível durante o fetch e trocamos de uma vez só — sem piscar.
+  if (!container.querySelector('.project-list')) {
+    container.innerHTML = `<div class="empty-state">Carregando...</div>`;
+  }
   let projects;
   let groups;
   try {
@@ -52,7 +52,12 @@ export async function renderSidebar(container, { selectedPath, onSelect, onRemov
     return;
   }
 
-  const refresh = () => renderSidebar(container, { selectedPath, onSelect, onRemoved });
+  // `currentSelected` acompanha o repo selecionado sem depender de re-render: ao
+  // clicar num card só atualizamos o destaque no lugar (mantém o scroll da nav e
+  // evita re-validar todos os repos). Um refresh completo só acontece em ações
+  // de grupo/add/remove ou no botão "Atualizar".
+  let currentSelected = selectedPath;
+  const refresh = () => renderSidebar(container, { selectedPath: currentSelected, onSelect, onRemoved });
 
   const total = projects.length;
   const ok = projects.filter((p) => isAvailable(p) && !hasChanges(p)).length;
@@ -107,9 +112,10 @@ export async function renderSidebar(container, { selectedPath, onSelect, onRemov
     const collapsed = !searchQuery && collapsedGroups.has(group.id);
     const count = countRepos(group.id);
     const subGroups = childGroupsOf(group.id).filter((g) => !searchQuery || subtreeHasMatch(g.id));
-    const childrenHtml = collapsed
-      ? ''
-      : `<div class="group-children">
+    // Os filhos são sempre renderizados (só escondidos com `hidden` quando
+    // recolhido), pra que recolher/expandir seja um toggle instantâneo no DOM,
+    // sem re-render nem re-fetch (que causavam a piscada na barra).
+    const childrenHtml = `<div class="group-children"${collapsed ? ' hidden' : ''}>
           ${subGroups.map(renderGroupNode).join('')}
           ${projectsIn(group.id)
             .map((p) => renderCard(p, selectedPath))
@@ -147,11 +153,9 @@ export async function renderSidebar(container, { selectedPath, onSelect, onRemov
           <span class="group-name">Sem grupo</span>
           <span class="pill">${ps.length}</span>
         </div>
-        ${
-          collapsed
-            ? ''
-            : `<div class="group-children">${ps.map((p) => renderCard(p, selectedPath)).join('')}</div>`
-        }
+        <div class="group-children"${collapsed ? ' hidden' : ''}>${ps
+          .map((p) => renderCard(p, selectedPath))
+          .join('')}</div>
       </div>
     `;
   }
@@ -163,6 +167,7 @@ export async function renderSidebar(container, { selectedPath, onSelect, onRemov
       <div class="sidebar-title">
         <div class="logo">📁</div>
         <h1>Git Manager</h1>
+        <button class="icon-btn sidebar-collapse-btn" id="collapse-sidebar-btn" title="Recolher barra lateral">⯇</button>
       </div>
       <div class="search-box">
         <input type="text" id="search-input" placeholder="Buscar por nome ou caminho..." value="${escapeHtml(searchQuery)}">
@@ -187,19 +192,34 @@ export async function renderSidebar(container, { selectedPath, onSelect, onRemov
     </div>
   `;
 
+  const listEl = container.querySelector('.project-list');
+  if (listEl) listEl.scrollTop = prevScroll;
+
   container.querySelector('#search-input').addEventListener('input', (e) => {
     searchQuery = e.target.value;
     refresh();
   });
 
+  container
+    .querySelector('#collapse-sidebar-btn')
+    .addEventListener('click', () => document.getElementById('app').classList.add('sidebar-collapsed'));
+
   // --- Colapsar/expandir grupos (clique no header, exceto nas ações) ---
+  // Toggle direto no DOM: esconde/mostra os filhos e vira a seta, sem re-render
+  // nem re-fetch (que causavam a piscada). Mantém scroll e estado intactos.
   container.querySelectorAll('.group-header').forEach((el) => {
     el.addEventListener('click', (e) => {
       if (e.target.closest('.group-actions')) return;
       const id = el.dataset.groupId;
-      if (collapsedGroups.has(id)) collapsedGroups.delete(id);
-      else collapsedGroups.add(id);
-      refresh();
+      const collapsed = !collapsedGroups.has(id); // estado após o toggle
+      if (collapsed) collapsedGroups.add(id);
+      else collapsedGroups.delete(id);
+
+      const node = el.closest('.group-node');
+      const children = node.querySelector(':scope > .group-children');
+      const caret = el.querySelector('.group-caret');
+      if (caret) caret.textContent = collapsed ? '▸' : '▾';
+      if (children) children.hidden = collapsed;
     });
   });
 
@@ -272,8 +292,12 @@ export async function renderSidebar(container, { selectedPath, onSelect, onRemov
   container.querySelectorAll('.project-card').forEach((el) => {
     el.addEventListener('click', (e) => {
       if (e.target.closest('.project-card-menu')) return;
+      // Só troca o destaque e atualiza o painel da direita — sem re-render da
+      // nav (mantém o scroll e não re-valida todos os repos).
+      currentSelected = el.dataset.path;
+      container.querySelectorAll('.project-card.active').forEach((c) => c.classList.remove('active'));
+      el.classList.add('active');
       onSelect(el.dataset.path);
-      refresh();
     });
   });
 
@@ -319,7 +343,7 @@ export async function renderSidebar(container, { selectedPath, onSelect, onRemov
 
   wireDragAndDrop(container, { wouldCreateCycle, refresh });
 
-  container.querySelector('#add-repo-btn').addEventListener('click', () => openAddRepoModal(groups, refresh));
+  container.querySelector('#add-repo-btn').addEventListener('click', () => openAddRepoModal(groups, projects, refresh));
 }
 
 // Drag & drop: arrasta um cartão de repositório (ou um grupo) e solta sobre um
@@ -384,7 +408,7 @@ function wireDragAndDrop(container, { wouldCreateCycle, refresh }) {
 }
 
 // Achata a árvore de grupos numa lista com rótulos indentados ("Pai / Filho"),
-// pra popular o <select> do modal de adicionar repositório.
+// pra popular o combobox de grupo do modal de adicionar repositório.
 function flattenGroups(groups) {
   const childrenMap = new Map();
   for (const g of groups) {
@@ -397,7 +421,7 @@ function flattenGroups(groups) {
   const out = [];
   const walk = (parentId, prefix) => {
     for (const g of childrenMap.get(parentId || '') || []) {
-      out.push({ id: g.id, label: prefix + g.name });
+      out.push({ id: g.id, name: g.name, label: prefix + g.name });
       walk(g.id, prefix + g.name + ' / ');
     }
   };
@@ -413,10 +437,34 @@ function flattenGroups(groups) {
 // vários" = escolher a pasta-pai. Só repos Git válidos entram na lista (o resto
 // é rejeitado com aviso), e o usuário ainda pode chamar o seletor quantas vezes
 // quiser, acumulando numa lista revisável antes de confirmar.
-function openAddRepoModal(groups, onDone) {
+function openAddRepoModal(groups, projects, onDone) {
   const picked = [];
-  let groupId = '';
+  // Combobox de grupo: o usuário pode escolher um grupo existente OU digitar um
+  // nome novo. Se o que ele digitar casar com um grupo existente, o repo entra
+  // nesse grupo; se não casar com nenhum, um novo grupo (de topo) é criado.
+  let groupText = '';
+  let selectedGroupId = null; // definido quando ele clica numa sugestão
   const groupOptions = flattenGroups(groups);
+
+  // Nomes dos repos por grupo, pra mostrar nas sugestões o que já existe lá.
+  const reposByGroup = new Map();
+  for (const p of projects) {
+    const key = p.groupId || '';
+    if (!reposByGroup.has(key)) reposByGroup.set(key, []);
+    reposByGroup.get(key).push(p.name);
+  }
+
+  const norm = (s) => (s || '').trim().toLowerCase();
+  const matchingGroups = () => {
+    const q = norm(groupText);
+    if (!q) return groupOptions;
+    return groupOptions.filter((g) => norm(g.label).includes(q) || norm(g.name).includes(q));
+  };
+  const exactMatch = () => {
+    const q = norm(groupText);
+    if (!q) return null;
+    return groupOptions.find((g) => norm(g.label) === q || norm(g.name) === q) || null;
+  };
 
   const overlay = document.createElement('div');
   overlay.className = 'modal-overlay';
@@ -429,12 +477,11 @@ function openAddRepoModal(groups, onDone) {
         <p>Selecione uma pasta que já é um repositório Git, <strong>ou</strong> uma pasta que contenha vários repositórios (todos serão detectados de uma vez). Você pode repetir a seleção quantas vezes quiser antes de confirmar.</p>
         <div class="form-group">
           <label>Grupo (opcional, aplicado a todos)</label>
-          <select id="add-repo-group">
-            <option value="">Sem grupo</option>
-            ${groupOptions
-              .map((g) => `<option value="${g.id}" ${g.id === groupId ? 'selected' : ''}>${escapeHtml(g.label)}</option>`)
-              .join('')}
-          </select>
+          <div class="combo">
+            <input type="text" id="group-input" autocomplete="off" placeholder="Selecionar grupo existente ou digitar um novo..." value="${escapeHtml(groupText)}">
+            <div class="combo-suggestions" id="group-suggestions"></div>
+          </div>
+          <div class="combo-hint" id="group-hint"></div>
         </div>
         <div class="modal-picked-list">
           ${
@@ -463,16 +510,88 @@ function openAddRepoModal(groups, onDone) {
     `;
   }
 
+  // Atualiza só a lista de sugestões e a dica (sem re-renderizar o modal todo,
+  // pra não perder o foco do input enquanto o usuário digita).
+  function updateGroupUI() {
+    const suggestionsEl = overlay.querySelector('#group-suggestions');
+    const hintEl = overlay.querySelector('#group-hint');
+    if (!suggestionsEl || !hintEl) return;
+
+    const matches = matchingGroups();
+    suggestionsEl.innerHTML = matches
+      .map((g) => {
+        const repos = reposByGroup.get(g.id) || [];
+        const sub =
+          repos.length === 0
+            ? 'grupo vazio'
+            : repos.slice(0, 3).join(', ') + (repos.length > 3 ? ` +${repos.length - 3}` : '');
+        return `
+          <div class="combo-item ${g.id === selectedGroupId ? 'selected' : ''}" data-group-id="${g.id}">
+            <span class="combo-item-name">${escapeHtml(g.label)}</span>
+            <span class="combo-item-sub">${escapeHtml(sub)}</span>
+          </div>`;
+      })
+      .join('');
+    suggestionsEl.style.display = matches.length ? 'block' : 'none';
+
+    const q = groupText.trim();
+    const em = exactMatch();
+    if (!q) {
+      hintEl.textContent = 'Sem grupo. Selecione um existente ou digite para criar um novo.';
+      hintEl.className = 'combo-hint';
+    } else if (em) {
+      const n = (reposByGroup.get(em.id) || []).length;
+      hintEl.textContent = `Adicionar ao grupo existente "${em.label}" (${n} repo(s) hoje).`;
+      hintEl.className = 'combo-hint exists';
+    } else {
+      hintEl.textContent = `Nenhum grupo com esse nome — será criado um novo grupo "${q}".`;
+      hintEl.className = 'combo-hint create';
+    }
+  }
+
   function rerender() {
-    const groupSelect = overlay.querySelector('#add-repo-group');
-    if (groupSelect) groupId = groupSelect.value;
+    const input = overlay.querySelector('#group-input');
+    if (input) groupText = input.value;
     overlay.innerHTML = modalHtml();
     wire();
   }
 
+  // Resolve o groupId final: sugestão clicada > grupo com nome exato > cria novo.
+  async function resolveGroupId() {
+    const q = groupText.trim();
+    if (!q) return '';
+    if (selectedGroupId) {
+      const g = groupOptions.find((o) => o.id === selectedGroupId);
+      if (g && norm(g.label) === norm(q)) return selectedGroupId;
+    }
+    const em = exactMatch();
+    if (em) return em.id;
+    const created = await api.addGroup(q, null);
+    return created.id;
+  }
+
   function wire() {
-    overlay.querySelector('#add-repo-group').addEventListener('change', (e) => {
-      groupId = e.target.value;
+    const groupInput = overlay.querySelector('#group-input');
+    const suggestionsEl = overlay.querySelector('#group-suggestions');
+
+    groupInput.addEventListener('input', () => {
+      groupText = groupInput.value;
+      selectedGroupId = null;
+      updateGroupUI();
+    });
+
+    // mousedown (não click) pra selecionar antes do blur do input.
+    suggestionsEl.addEventListener('mousedown', (e) => {
+      const item = e.target.closest('[data-group-id]');
+      if (!item) return;
+      e.preventDefault();
+      const g = groupOptions.find((o) => o.id === item.dataset.groupId);
+      if (!g) return;
+      selectedGroupId = g.id;
+      groupText = g.label;
+      groupInput.value = g.label;
+      updateGroupUI();
+      groupInput.focus();
     });
 
     overlay.querySelector('#pick-folder-btn').addEventListener('click', async () => {
@@ -513,11 +632,17 @@ function openAddRepoModal(groups, onDone) {
     const confirmBtn = overlay.querySelector('[data-action="confirm"]');
     if (confirmBtn) {
       confirmBtn.addEventListener('click', async () => {
-        const selectedGroupId = overlay.querySelector('#add-repo-group').value;
+        let groupId;
+        try {
+          groupId = await resolveGroupId();
+        } catch (err) {
+          toastError('Erro ao definir o grupo', err.message);
+          return;
+        }
         let successCount = 0;
         for (const p of picked) {
           try {
-            await api.addProject({ path: p, groupId: selectedGroupId });
+            await api.addProject({ path: p, groupId });
             successCount++;
           } catch (err) {
             toastError(`Erro ao adicionar ${p}`, err.message);
@@ -528,35 +653,29 @@ function openAddRepoModal(groups, onDone) {
         onDone();
       });
     }
+
+    updateGroupUI();
   }
 
   overlay.innerHTML = modalHtml();
   wire();
 }
 
+// Card minimalista: só a cor do status (dot) e o nome. Os detalhes (branch,
+// alterações, ahead/behind, caminho) ficam no painel da direita ao clicar. O
+// caminho completo fica no tooltip; as ações (renomear/remover) só no hover.
 function renderCard(p, selectedPath) {
   const active = p.path === selectedPath;
-  const syncPill =
-    p.ahead > 0 || p.behind > 0
-      ? `<span class="pill sync">${p.ahead > 0 ? `↑${p.ahead}` : ''}${p.behind > 0 ? ` ↓${p.behind}` : ''}</span>`
-      : '';
-  const statusText = p.statusSummary !== 'Limpo' ? ` • ${p.statusSummary}` : '';
-
+  const statusTitle =
+    `${p.currentBranch}` + (p.statusSummary && p.statusSummary !== 'Limpo' ? ` • ${p.statusSummary}` : '');
   return `
-    <div class="project-card ${active ? 'active' : ''}" data-path="${escapeHtml(p.path)}" draggable="true">
-      <div class="project-card-top">
-        <span class="status-dot ${statusClass(p)}"></span>
-        <span class="project-card-name">${escapeHtml(p.name)}</span>
-        ${syncPill}
-        <span class="project-card-menu">
-          <button class="icon-btn" data-action="rename" data-path="${escapeHtml(p.path)}" title="Renomear">✎</button>
-          <button class="icon-btn" data-action="remove" data-path="${escapeHtml(p.path)}" title="Remover">🗑</button>
-        </span>
-      </div>
-      <div class="project-card-meta">
-        <span class="branch-icon">⑂</span> ${escapeHtml(p.currentBranch)}${statusText}
-      </div>
-      <span class="project-card-path">${escapeHtml(shortPath(p.path))}</span>
+    <div class="project-card ${active ? 'active' : ''}" data-path="${escapeHtml(p.path)}" draggable="true" title="${escapeHtml(p.path + ' — ' + statusTitle)}">
+      <span class="status-dot ${statusClass(p)}" title="${escapeHtml(statusTitle)}"></span>
+      <span class="project-card-name">${escapeHtml(p.name)}</span>
+      <span class="project-card-menu">
+        <button class="icon-btn" data-action="rename" data-path="${escapeHtml(p.path)}" title="Renomear">✎</button>
+        <button class="icon-btn" data-action="remove" data-path="${escapeHtml(p.path)}" title="Remover">🗑</button>
+      </span>
     </div>
   `;
 }

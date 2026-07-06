@@ -125,15 +125,35 @@ async function getBranches(repoPath) {
 }
 
 async function getCommits(repoPath, limit = 50) {
-  const log = await git(repoPath).log({ maxCount: limit });
-  return log.all.map((c) => ({
-    id: c.hash,
-    shortId: c.hash.slice(0, 7),
-    message: c.message,
-    authorName: c.author_name,
-    authorEmail: c.author_email,
-    date: c.date
-  }));
+  // Formato custom pra obter também os hashes dos pais (%P) e as refs/decorações
+  // (%D) — necessários pra montar o grafo do histórico. Campos separados por
+  // Unit Separator (0x1f) e commits por linha (%s é só o assunto, sem quebras).
+  const SEP = '\x1f';
+  const fmt = ['%H', '%h', '%P', '%an', '%ae', '%ad', '%D', '%s'].join(SEP);
+  const out = await git(repoPath).raw([
+    'log',
+    `--max-count=${limit}`,
+    '--topo-order', // pais sempre abaixo dos filhos: grafo estável, sem cruzar colunas por data
+    '--date=iso',
+    `--pretty=format:${fmt}`
+  ]);
+  if (!out) return [];
+  return out
+    .split('\n')
+    .filter(Boolean)
+    .map((line) => {
+      const [hash, short, parents, authorName, authorEmail, date, refs, subject] = line.split(SEP);
+      return {
+        id: hash,
+        shortId: short,
+        parents: parents ? parents.split(' ').filter(Boolean) : [],
+        message: subject || '',
+        authorName,
+        authorEmail,
+        date,
+        refs: refs || ''
+      };
+    });
 }
 
 function classifyFileEntries(f) {
