@@ -17,7 +17,9 @@ export function confirmDialog({ title, message, confirmLabel = 'Confirmar', dang
       </div>
     `);
 
+    const keyController = new AbortController();
     const close = (result) => {
+      keyController.abort();
       overlay.remove();
       resolve(result);
     };
@@ -27,6 +29,12 @@ export function confirmDialog({ title, message, confirmLabel = 'Confirmar', dang
     overlay.addEventListener('click', (e) => {
       if (e.target === overlay) close(false);
     });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') close(false);
+      if (e.key === 'Enter') close(true);
+    }, { signal: keyController.signal });
+
+    overlay.querySelector('[data-action="confirm"]').focus();
   });
 }
 
