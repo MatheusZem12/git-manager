@@ -6,13 +6,13 @@ function openOverlay(innerHtml) {
   return overlay;
 }
 
-export function confirmDialog({ title, message, confirmLabel = 'Confirmar', danger = true }) {
+export function confirmDialog({ title, message, confirmLabel = 'Confirm', danger = true }) {
   return new Promise((resolve) => {
     const overlay = openOverlay(`
       <h3>${title}</h3>
       <p>${message}</p>
       <div class="modal-actions">
-        <button class="btn btn-ghost" data-action="cancel">Cancelar</button>
+        <button class="btn btn-ghost" data-action="cancel">Cancel</button>
         <button class="btn ${danger ? 'btn-danger' : 'btn-primary'}" data-action="confirm">${confirmLabel}</button>
       </div>
     `);
@@ -38,7 +38,7 @@ export function confirmDialog({ title, message, confirmLabel = 'Confirmar', dang
   });
 }
 
-export function promptDialog({ title, label = '', placeholder = '', initialValue = '', confirmLabel = 'Confirmar' }) {
+export function promptDialog({ title, label = '', placeholder = '', initialValue = '', confirmLabel = 'Confirm' }) {
   return new Promise((resolve) => {
     const overlay = openOverlay(`
       <h3>${title}</h3>
@@ -47,7 +47,7 @@ export function promptDialog({ title, label = '', placeholder = '', initialValue
         <input type="text" id="prompt-input" placeholder="${placeholder}" value="${initialValue}">
       </div>
       <div class="modal-actions">
-        <button class="btn btn-ghost" data-action="cancel">Cancelar</button>
+        <button class="btn btn-ghost" data-action="cancel">Cancel</button>
         <button class="btn btn-primary" data-action="confirm">${confirmLabel}</button>
       </div>
     `);

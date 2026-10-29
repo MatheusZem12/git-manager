@@ -9,12 +9,12 @@ const filterText = new Map();
 const changesCache = new Map();
 
 const TYPE_LABELS = {
-  ADDED: 'Novo',
-  MODIFIED: 'Modificado',
-  DELETED: 'Deletado',
-  RENAMED: 'Renomeado',
-  CONFLICTING: 'Conflito',
-  UNTRACKED: 'Não rastreado'
+  ADDED: 'New',
+  MODIFIED: 'Modified',
+  DELETED: 'Deleted',
+  RENAMED: 'Renamed',
+  CONFLICTING: 'Conflict',
+  UNTRACKED: 'Untracked'
 };
 
 function getSet(map, repoPath) {
@@ -29,7 +29,7 @@ function escapeHtml(str) {
 }
 
 export async function renderStagingTab(container, repoPath) {
-  container.innerHTML = `<div class="card">Carregando...</div>`;
+  container.innerHTML = `<div class="card">Loading...</div>`;
   const changes = await api.getChanges(repoPath);
   changesCache.set(repoPath, changes);
   renderLayout(container, repoPath);
@@ -47,17 +47,17 @@ function renderLayout(container, repoPath) {
     <div class="staging-layout">
       <div class="staging-files">
         <div class="staging-filter">
-          <input type="text" id="filter-input" placeholder="Filtrar arquivos..." value="${escapeHtml(filterText.get(repoPath) || '')}">
+          <input type="text" id="filter-input" placeholder="Filter files..." value="${escapeHtml(filterText.get(repoPath) || '')}">
         </div>
         <div class="staging-sections">
-          ${renderSection('unstaged', 'Não staged', unstaged, repoPath, active)}
+          ${renderSection('unstaged', 'Unstaged', unstaged, repoPath, active)}
           ${staged.length > 0 ? renderSection('staged', 'Staged', staged, repoPath, active) : ''}
         </div>
       </div>
       <div class="diff-panel" id="diff-panel"></div>
     </div>
     <div class="commit-bar">
-      <input type="text" id="commit-message" placeholder="Mensagem de commit">
+      <input type="text" id="commit-message" placeholder="Commit message">
       <button class="btn btn-success" id="commit-btn" ${staged.length === 0 ? 'disabled' : ''}>Commit${staged.length > 0 ? ` (${staged.length})` : ''}</button>
     </div>
   `;
@@ -79,8 +79,8 @@ function renderSection(kind, title, files, repoPath, active) {
         <span>${title} (${files.length})</span>
         ${
           files.length > 0
-            ? `<button class="link-btn" data-action="select-all" data-kind="${kind}">Todos</button>
-               <button class="link-btn" data-action="select-none" data-kind="${kind}">Nenhum</button>`
+            ? `<button class="link-btn" data-action="select-all" data-kind="${kind}">All</button>
+               <button class="link-btn" data-action="select-none" data-kind="${kind}">None</button>`
             : ''
         }
         <span style="flex: 1;"></span>
@@ -159,9 +159,9 @@ function wireEvents(container, repoPath) {
       try {
         await api.stageFiles(repoPath, files);
         getSet(selUnstaged, repoPath).clear();
-        toastSuccess(`${files.length} arquivo(s) staged`);
+        toastSuccess(`${files.length} file(s) staged`);
       } catch (err) {
-        toastError('Erro ao dar stage', err.message);
+        toastError('Error staging', err.message);
       }
       refetch();
     });
@@ -174,9 +174,9 @@ function wireEvents(container, repoPath) {
       try {
         await api.unstageFiles(repoPath, files);
         getSet(selStaged, repoPath).clear();
-        toastSuccess(`${files.length} arquivo(s) unstaged`);
+        toastSuccess(`${files.length} file(s) unstaged`);
       } catch (err) {
-        toastError('Erro ao dar unstage', err.message);
+        toastError('Error unstaging', err.message);
       }
       refetch();
     });
@@ -187,16 +187,16 @@ function wireEvents(container, repoPath) {
   const doCommit = async () => {
     const message = messageInput.value.trim();
     if (!message) {
-      toastError('Escreva uma mensagem de commit');
+      toastError('Write a commit message');
       return;
     }
     try {
       await api.commit(repoPath, message);
-      toastSuccess('Commit realizado');
+      toastSuccess('Commit done');
       activeFile.delete(repoPath);
       refetch();
     } catch (err) {
-      toastError('Erro ao commitar', err.message);
+      toastError('Error committing', err.message);
     }
   };
   commitBtn.addEventListener('click', doCommit);
@@ -208,7 +208,7 @@ function wireEvents(container, repoPath) {
 async function renderDiffPanel(panel, repoPath) {
   const active = activeFile.get(repoPath);
   if (!active) {
-    panel.innerHTML = `<div class="diff-empty">Selecione um arquivo para ver o diff</div>`;
+    panel.innerHTML = `<div class="diff-empty">Select a file to see the diff</div>`;
     return;
   }
 
@@ -216,13 +216,13 @@ async function renderDiffPanel(panel, repoPath) {
   panel.innerHTML = `
     <div class="diff-panel-header">
       <span class="file-path ${active.staged ? '' : ''}">${escapeHtml(active.path)}</span>
-      <button class="btn btn-ghost tiny" id="open-external-btn">Abrir arquivo</button>
+      <button class="btn btn-ghost tiny" id="open-external-btn">Open file</button>
     </div>
     <div class="diff-tabs">
       <button class="diff-tab ${tab === 'diff' ? 'active' : ''}" data-difftab="diff">Diff</button>
-      <button class="diff-tab ${tab === 'file' ? 'active' : ''}" data-difftab="file">Arquivo</button>
+      <button class="diff-tab ${tab === 'file' ? 'active' : ''}" data-difftab="file">File</button>
     </div>
-    <div class="diff-body" id="diff-body">Carregando...</div>
+    <div class="diff-body" id="diff-body">Loading...</div>
   `;
 
   panel.querySelector('#open-external-btn').addEventListener('click', () => {
@@ -281,11 +281,11 @@ function parseUnifiedDiff(diffText) {
 
 function renderDiffHtml(diffText) {
   if (!diffText || diffText.trim() === '') {
-    return `<div class="diff-empty">Nenhuma alteração detectada.</div>`;
+    return `<div class="diff-empty">No changes detected.</div>`;
   }
   const rows = parseUnifiedDiff(diffText);
   if (rows.length === 0) {
-    return `<div class="diff-empty">Sem diferenças textuais.</div>`;
+    return `<div class="diff-empty">No text differences.</div>`;
   }
   return rows
     .map((r) => {
@@ -299,7 +299,7 @@ function renderDiffHtml(diffText) {
 
 function renderFileHtml(content) {
   if (content === null) {
-    return `<div class="diff-empty">(arquivo não existe no disco)</div>`;
+    return `<div class="diff-empty">(the file doesn't exist on disk)</div>`;
   }
   return content
     .split('\n')

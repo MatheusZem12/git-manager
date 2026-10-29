@@ -3,8 +3,8 @@ import { confirmDialog, promptDialog } from '../services/dialogs.js';
 import { toastSuccess, toastError } from '../services/toast.js';
 
 let searchQuery = '';
-// Estado de colapso por id de grupo. A seção "Sem grupo" usa a chave '' (ids de
-// grupos reais nunca são vazios).
+// Collapse state per group id. The "No group" section uses the key '' (real group
+// ids are never empty).
 const collapsedGroups = new Set();
 const UNGROUPED = '';
 
@@ -13,7 +13,7 @@ function isAvailable(p) {
 }
 
 function hasChanges(p) {
-  return isAvailable(p) && (p.statusSummary !== 'Limpo' || p.ahead > 0 || p.behind > 0);
+  return isAvailable(p) && (p.statusSummary !== 'Clean' || p.ahead > 0 || p.behind > 0);
 }
 
 function statusClass(p) {
@@ -36,26 +36,26 @@ function escapeHtml(s) {
 }
 
 export async function renderSidebar(container, { selectedPath, onSelect, onRemoved }) {
-  // Preserva a posição de scroll da lista entre re-renders (ex: ao atualizar).
+  // Keeps the list scroll position across re-renders (e.g. on refresh).
   const prevScroll = container.querySelector('.project-list')?.scrollTop || 0;
-  // "Carregando..." só no primeiro load. Nos refreshes seguintes mantemos o
-  // conteúdo atual visível durante o fetch e trocamos de uma vez só — sem piscar.
+  // "Loading..." only on the first load. On later refreshes we keep the current
+  // content visible during the fetch and swap it in one go — no flicker.
   if (!container.querySelector('.project-list')) {
-    container.innerHTML = `<div class="empty-state">Carregando...</div>`;
+    container.innerHTML = `<div class="empty-state">Loading...</div>`;
   }
   let projects;
   let groups;
   try {
     [projects, groups] = await Promise.all([api.listProjects(), api.listGroups()]);
   } catch (err) {
-    container.innerHTML = `<div class="empty-state">Erro ao carregar projetos: ${escapeHtml(err.message)}</div>`;
+    container.innerHTML = `<div class="empty-state">Error loading projects: ${escapeHtml(err.message)}</div>`;
     return;
   }
 
-  // `currentSelected` acompanha o repo selecionado sem depender de re-render: ao
-  // clicar num card só atualizamos o destaque no lugar (mantém o scroll da nav e
-  // evita re-validar todos os repos). Um refresh completo só acontece em ações
-  // de grupo/add/remove ou no botão "Atualizar".
+  // `currentSelected` tracks the selected repo without a re-render: clicking a
+  // card only updates the highlight in place (keeps the nav scroll and avoids
+  // re-validating every repo). A full refresh only happens on group/add/remove
+  // actions or the "Refresh" button.
   let currentSelected = selectedPath;
   const refresh = () => renderSidebar(container, { selectedPath: currentSelected, onSelect, onRemoved });
 
@@ -64,10 +64,10 @@ export async function renderSidebar(container, { selectedPath, onSelect, onRemov
   const warn = projects.filter((p) => hasChanges(p)).length;
   const danger = projects.filter((p) => !isAvailable(p)).length;
 
-  // --- Índices da árvore de grupos + projetos ---
+  // --- Indexes of the group + project tree ---
   const filtered = projects.filter(matchesSearch);
 
-  const childrenMap = new Map(); // parentId ('' = topo) -> [grupo]
+  const childrenMap = new Map(); // parentId ('' = top level) -> [group]
   for (const g of groups) {
     const key = g.parentId || '';
     if (!childrenMap.has(key)) childrenMap.set(key, []);
@@ -75,7 +75,7 @@ export async function renderSidebar(container, { selectedPath, onSelect, onRemov
   }
   for (const arr of childrenMap.values()) arr.sort((a, b) => a.name.localeCompare(b.name));
 
-  const projectsByGroup = new Map(); // groupId ('' = sem grupo) -> [projeto]
+  const projectsByGroup = new Map(); // groupId ('' = no group) -> [project]
   for (const p of filtered) {
     const key = p.groupId || '';
     if (!projectsByGroup.has(key)) projectsByGroup.set(key, []);
@@ -96,8 +96,8 @@ export async function renderSidebar(container, { selectedPath, onSelect, onRemov
     if (projectsIn(groupId).length > 0) return true;
     return childGroupsOf(groupId).some((c) => subtreeHasMatch(c.id));
   }
-  // Evita ciclos ao mover grupos: alvo não pode ser o próprio grupo nem um
-  // descendente dele.
+  // Avoids cycles when moving groups: the target can't be the group itself or
+  // one of its descendants.
   function wouldCreateCycle(movingId, targetId) {
     let cur = targetId;
     while (cur) {
@@ -108,13 +108,13 @@ export async function renderSidebar(container, { selectedPath, onSelect, onRemov
   }
 
   function renderGroupNode(group) {
-    // Ao buscar, tudo aparece expandido pra facilitar ver os resultados.
+    // While searching, everything shows expanded to make results easy to see.
     const collapsed = !searchQuery && collapsedGroups.has(group.id);
     const count = countRepos(group.id);
     const subGroups = childGroupsOf(group.id).filter((g) => !searchQuery || subtreeHasMatch(g.id));
-    // Os filhos são sempre renderizados (só escondidos com `hidden` quando
-    // recolhido), pra que recolher/expandir seja um toggle instantâneo no DOM,
-    // sem re-render nem re-fetch (que causavam a piscada na barra).
+    // Children are always rendered (only hidden with `hidden` when collapsed),
+    // so collapsing/expanding is an instant toggle in the DOM, with no
+    // re-render or re-fetch (which made the sidebar flicker).
     const childrenHtml = `<div class="group-children"${collapsed ? ' hidden' : ''}>
           ${subGroups.map(renderGroupNode).join('')}
           ${projectsIn(group.id)
@@ -128,9 +128,9 @@ export async function renderSidebar(container, { selectedPath, onSelect, onRemov
           <span class="group-name">${escapeHtml(group.name)}</span>
           <span class="pill">${count}</span>
           <span class="group-actions">
-            <button class="icon-btn" data-group-action="add-sub" data-group-id="${group.id}" title="Novo subgrupo">＋</button>
-            <button class="icon-btn" data-group-action="rename" data-group-id="${group.id}" title="Renomear grupo">✎</button>
-            <button class="icon-btn" data-group-action="remove" data-group-id="${group.id}" title="Excluir grupo">🗑</button>
+            <button class="icon-btn" data-group-action="add-sub" data-group-id="${group.id}" title="New subgroup">＋</button>
+            <button class="icon-btn" data-group-action="rename" data-group-id="${group.id}" title="Rename group">✎</button>
+            <button class="icon-btn" data-group-action="remove" data-group-id="${group.id}" title="Delete group">🗑</button>
           </span>
         </div>
         ${childrenHtml}
@@ -140,9 +140,9 @@ export async function renderSidebar(container, { selectedPath, onSelect, onRemov
 
   function renderUngrouped() {
     const ps = projectsIn(UNGROUPED);
-    // Ao buscar, só mostra se houver resultado sem grupo. Sem busca, mostra
-    // sempre que existirem repos soltos ou grupos (pra servir de alvo de
-    // "arrastar pra fora").
+    // While searching, it only shows if there is an ungrouped result. Without a
+    // search, it shows whenever there are loose repos or groups (to serve as the
+    // "drag out" target).
     if (searchQuery && ps.length === 0) return '';
     if (!searchQuery && ps.length === 0 && groups.length === 0) return '';
     const collapsed = !searchQuery && collapsedGroups.has(UNGROUPED);
@@ -150,7 +150,7 @@ export async function renderSidebar(container, { selectedPath, onSelect, onRemov
       <div class="group-node" data-group-id="">
         <div class="group-header" data-group-id="" draggable="false">
           <span class="group-caret">${collapsed ? '▸' : '▾'}</span>
-          <span class="group-name">Sem grupo</span>
+          <span class="group-name">No group</span>
           <span class="pill">${ps.length}</span>
         </div>
         <div class="group-children"${collapsed ? ' hidden' : ''}>${ps
@@ -167,28 +167,28 @@ export async function renderSidebar(container, { selectedPath, onSelect, onRemov
       <div class="sidebar-title">
         <div class="logo">📁</div>
         <h1>Git Manager</h1>
-        <button class="icon-btn sidebar-collapse-btn" id="collapse-sidebar-btn" title="Recolher barra lateral">⯇</button>
+        <button class="icon-btn sidebar-collapse-btn" id="collapse-sidebar-btn" title="Collapse sidebar">⯇</button>
       </div>
       <div class="search-box">
-        <input type="text" id="search-input" placeholder="Buscar por nome ou caminho..." value="${escapeHtml(searchQuery)}">
+        <input type="text" id="search-input" placeholder="Search by name or path..." value="${escapeHtml(searchQuery)}">
       </div>
     </div>
     <div class="stats-bar">
       <div class="stat"><div class="stat-value">${total}</div><div class="stat-label">Total</div></div>
       <div class="stat ok"><div class="stat-value">${ok}</div><div class="stat-label">OK</div></div>
-      <div class="stat warn"><div class="stat-value">${warn}</div><div class="stat-label">Alterações</div></div>
-      <div class="stat danger"><div class="stat-value">${danger}</div><div class="stat-label">Indisponível</div></div>
+      <div class="stat warn"><div class="stat-value">${warn}</div><div class="stat-label">Changes</div></div>
+      <div class="stat danger"><div class="stat-value">${danger}</div><div class="stat-label">Unavailable</div></div>
     </div>
     <div class="project-list">
       ${
         total === 0 && groups.length === 0
-          ? `<div class="empty-state"><div class="empty-icon">📭</div>Nenhum repositório cadastrado.<br>Clique em "Adicionar repositório" abaixo.</div>`
+          ? `<div class="empty-state"><div class="empty-icon">📭</div>No repositories yet.<br>Click "Add repository" below.</div>`
           : topGroups.map(renderGroupNode).join('') + renderUngrouped()
       }
     </div>
     <div class="sidebar-footer">
-      <button class="btn btn-ghost" id="add-group-btn" style="width: 100%; margin-bottom: 8px;">+ Novo grupo</button>
-      <button class="btn btn-primary" id="add-repo-btn" style="width: 100%;">+ Adicionar repositório</button>
+      <button class="btn btn-ghost" id="add-group-btn" style="width: 100%; margin-bottom: 8px;">+ New group</button>
+      <button class="btn btn-primary" id="add-repo-btn" style="width: 100%;">+ Add repository</button>
     </div>
   `;
 
@@ -204,14 +204,14 @@ export async function renderSidebar(container, { selectedPath, onSelect, onRemov
     .querySelector('#collapse-sidebar-btn')
     .addEventListener('click', () => document.getElementById('app').classList.add('sidebar-collapsed'));
 
-  // --- Colapsar/expandir grupos (clique no header, exceto nas ações) ---
-  // Toggle direto no DOM: esconde/mostra os filhos e vira a seta, sem re-render
-  // nem re-fetch (que causavam a piscada). Mantém scroll e estado intactos.
+  // --- Collapse/expand groups (click on the header, except on the actions) ---
+  // A direct DOM toggle: hides/shows the children and flips the arrow, with no
+  // re-render or re-fetch (which caused the flicker). Keeps scroll and state intact.
   container.querySelectorAll('.group-header').forEach((el) => {
     el.addEventListener('click', (e) => {
       if (e.target.closest('.group-actions')) return;
       const id = el.dataset.groupId;
-      const collapsed = !collapsedGroups.has(id); // estado após o toggle
+      const collapsed = !collapsedGroups.has(id); // state after the toggle
       if (collapsed) collapsedGroups.add(id);
       else collapsedGroups.delete(id);
 
@@ -223,19 +223,19 @@ export async function renderSidebar(container, { selectedPath, onSelect, onRemov
     });
   });
 
-  // --- Ações de grupo: novo subgrupo, renomear, excluir ---
+  // --- Group actions: new subgroup, rename, delete ---
   container.querySelectorAll('[data-group-action="add-sub"]').forEach((el) => {
     el.addEventListener('click', async (e) => {
       e.stopPropagation();
-      const name = await promptDialog({ title: 'Novo subgrupo', label: 'Nome do subgrupo', placeholder: 'ex: cliente X' });
+      const name = await promptDialog({ title: 'New subgroup', label: 'Subgroup name', placeholder: 'e.g. client X' });
       if (!name) return;
       try {
         await api.addGroup(name, el.dataset.groupId);
-        collapsedGroups.delete(el.dataset.groupId); // expande o pai pra mostrar o novo
-        toastSuccess('Subgrupo criado');
+        collapsedGroups.delete(el.dataset.groupId); // expand the parent to show the new one
+        toastSuccess('Subgroup created');
         refresh();
       } catch (err) {
-        toastError('Erro ao criar subgrupo', err.message);
+        toastError('Error creating subgroup', err.message);
       }
     });
   });
@@ -244,14 +244,14 @@ export async function renderSidebar(container, { selectedPath, onSelect, onRemov
     el.addEventListener('click', async (e) => {
       e.stopPropagation();
       const g = groups.find((grp) => grp.id === el.dataset.groupId);
-      const name = await promptDialog({ title: 'Renomear grupo', label: 'Nome', initialValue: g ? g.name : '' });
+      const name = await promptDialog({ title: 'Rename group', label: 'Name', initialValue: g ? g.name : '' });
       if (!name) return;
       try {
         await api.renameGroup(el.dataset.groupId, name);
-        toastSuccess('Grupo renomeado');
+        toastSuccess('Group renamed');
         refresh();
       } catch (err) {
-        toastError('Erro ao renomear grupo', err.message);
+        toastError('Error renaming group', err.message);
       }
     });
   });
@@ -261,39 +261,39 @@ export async function renderSidebar(container, { selectedPath, onSelect, onRemov
       e.stopPropagation();
       const g = groups.find((grp) => grp.id === el.dataset.groupId);
       const ok2 = await confirmDialog({
-        title: 'Excluir grupo',
-        message: `Excluir o grupo "${g ? g.name : ''}"? Os repositórios e subgrupos dentro dele sobem para o grupo pai (ou "Sem grupo"). Nenhum arquivo é apagado do disco.`,
-        confirmLabel: 'Excluir'
+        title: 'Delete group',
+        message: `Delete the group "${g ? g.name : ''}"? The repositories and subgroups inside it move up to the parent group (or "No group"). No file is deleted from disk.`,
+        confirmLabel: 'Delete'
       });
       if (!ok2) return;
       try {
         await api.removeGroup(el.dataset.groupId);
-        toastSuccess('Grupo excluído');
+        toastSuccess('Group deleted');
         refresh();
       } catch (err) {
-        toastError('Erro ao excluir grupo', err.message);
+        toastError('Error deleting group', err.message);
       }
     });
   });
 
   container.querySelector('#add-group-btn').addEventListener('click', async () => {
-    const name = await promptDialog({ title: 'Novo grupo', label: 'Nome do grupo', placeholder: 'ex: trabalho' });
+    const name = await promptDialog({ title: 'New group', label: 'Group name', placeholder: 'e.g. work' });
     if (!name) return;
     try {
       await api.addGroup(name, null);
-      toastSuccess('Grupo criado');
+      toastSuccess('Group created');
       refresh();
     } catch (err) {
-      toastError('Erro ao criar grupo', err.message);
+      toastError('Error creating group', err.message);
     }
   });
 
-  // --- Cartões de projeto: selecionar, renomear, remover ---
+  // --- Project cards: select, rename, remove ---
   container.querySelectorAll('.project-card').forEach((el) => {
     el.addEventListener('click', (e) => {
       if (e.target.closest('.project-card-menu')) return;
-      // Só troca o destaque e atualiza o painel da direita — sem re-render da
-      // nav (mantém o scroll e não re-valida todos os repos).
+      // Only moves the highlight and updates the right panel — no nav re-render
+      // (keeps the scroll and doesn't re-validate every repo).
       currentSelected = el.dataset.path;
       container.querySelectorAll('.project-card.active').forEach((c) => c.classList.remove('active'));
       el.classList.add('active');
@@ -305,14 +305,14 @@ export async function renderSidebar(container, { selectedPath, onSelect, onRemov
     el.addEventListener('click', async (e) => {
       e.stopPropagation();
       const p = projects.find((proj) => proj.path === el.dataset.path);
-      const newName = await promptDialog({ title: 'Renomear projeto', label: 'Nome', initialValue: p.name });
+      const newName = await promptDialog({ title: 'Rename project', label: 'Name', initialValue: p.name });
       if (!newName) return;
       try {
         await api.updateProject(p.path, { name: newName });
-        toastSuccess('Projeto renomeado');
+        toastSuccess('Project renamed');
         refresh();
       } catch (err) {
-        toastError('Erro ao renomear', err.message);
+        toastError('Error renaming', err.message);
       }
     });
   });
@@ -322,21 +322,21 @@ export async function renderSidebar(container, { selectedPath, onSelect, onRemov
       e.stopPropagation();
       const p = projects.find((proj) => proj.path === el.dataset.path);
       const ok2 = await confirmDialog({
-        title: 'Remover projeto',
-        message: `Remover "${p.name}" da lista? Isso não apaga os arquivos do disco, só desassocia do Git Manager.`,
-        confirmLabel: 'Remover'
+        title: 'Remove project',
+        message: `Remove "${p.name}" from the list? This doesn't delete the files from disk, it only unlinks them from Git Manager.`,
+        confirmLabel: 'Remove'
       });
       if (!ok2) return;
       try {
         await api.removeProject(p.path);
-        toastSuccess('Projeto removido');
+        toastSuccess('Project removed');
         if (selectedPath === p.path && onRemoved) {
           await onRemoved();
         } else {
           refresh();
         }
       } catch (err) {
-        toastError('Erro ao remover', err.message);
+        toastError('Error removing', err.message);
       }
     });
   });
@@ -346,10 +346,10 @@ export async function renderSidebar(container, { selectedPath, onSelect, onRemov
   container.querySelector('#add-repo-btn').addEventListener('click', () => openAddRepoModal(groups, projects, refresh));
 }
 
-// Drag & drop: arrasta um cartão de repositório (ou um grupo) e solta sobre um
-// grupo (ou sobre "Sem grupo") para movê-lo. Cada `.group-node` é uma zona de
-// soltura; usamos stopPropagation pra que só o nó mais interno sob o cursor
-// reaja (nós aninhados).
+// Drag & drop: drag a repository card (or a group) and drop it on a group
+// (or on "No group") to move it. Each `.group-node` is a drop zone; we use
+// stopPropagation so only the innermost node under the cursor reacts
+// (nested nodes).
 function wireDragAndDrop(container, { wouldCreateCycle, refresh }) {
   container.querySelectorAll('.project-card').forEach((card) => {
     card.setAttribute('draggable', 'true');
@@ -394,21 +394,21 @@ function wireDragAndDrop(container, { wouldCreateCycle, refresh }) {
           await api.updateProject(payload.path, { groupId: targetGroupId });
         } else if (payload.type === 'group') {
           if (payload.id === targetGroupId || wouldCreateCycle(payload.id, targetGroupId)) {
-            toastError('Movimento inválido', 'Não dá pra mover um grupo para dentro de si mesmo.');
+            toastError('Invalid move', 'A group cannot be moved into itself.');
             return;
           }
           await api.reparentGroup(payload.id, targetGroupId || null);
         }
         refresh();
       } catch (err) {
-        toastError('Erro ao mover', err.message);
+        toastError('Error moving', err.message);
       }
     });
   });
 }
 
-// Achata a árvore de grupos numa lista com rótulos indentados ("Pai / Filho"),
-// pra popular o combobox de grupo do modal de adicionar repositório.
+// Flattens the group tree into a list with indented labels ("Parent / Child"),
+// to fill the group combobox of the add-repository modal.
 function flattenGroups(groups) {
   const childrenMap = new Map();
   for (const g of groups) {
@@ -429,24 +429,24 @@ function flattenGroups(groups) {
   return out;
 }
 
-// Multi-seleção de pastas é quebrada no Linux (o Chromium só ativa multi-select
-// pra arquivos, nunca pra pastas), então não dependemos do diálogo nativo pra
-// isso. Em vez disso, cada pasta escolhida é resolvida no processo principal
-// para os repos Git que ela contém: se a própria pasta é um repo, entra ela; se
-// não, entram todos os repos dos subdiretórios imediatos. Assim "selecionar
-// vários" = escolher a pasta-pai. Só repos Git válidos entram na lista (o resto
-// é rejeitado com aviso), e o usuário ainda pode chamar o seletor quantas vezes
-// quiser, acumulando numa lista revisável antes de confirmar.
+// Folder multi-selection is broken on Linux (Chromium only enables multi-select
+// for files, never for folders), so we don't rely on the native dialog for
+// it. Instead, each chosen folder is resolved in the main process into the
+// Git repos it contains: if the folder itself is a repo, it goes in; if not,
+// every repo in its immediate subdirectories goes in. So "select several" =
+// picking the parent folder. Only valid Git repos join the list (the rest is
+// rejected with a warning), and the user can still open the picker as many
+// times as they like, building a reviewable list before confirming.
 function openAddRepoModal(groups, projects, onDone) {
   const picked = [];
-  // Combobox de grupo: o usuário pode escolher um grupo existente OU digitar um
-  // nome novo. Se o que ele digitar casar com um grupo existente, o repo entra
-  // nesse grupo; se não casar com nenhum, um novo grupo (de topo) é criado.
+  // Group combobox: the user can pick an existing group OR type a new name.
+  // If what they type matches an existing group, the repo goes into that
+  // group; if it matches none, a new (top-level) group is created.
   let groupText = '';
-  let selectedGroupId = null; // definido quando ele clica numa sugestão
+  let selectedGroupId = null; // set when they click a suggestion
   const groupOptions = flattenGroups(groups);
 
-  // Nomes dos repos por grupo, pra mostrar nas sugestões o que já existe lá.
+  // Repo names per group, to show in the suggestions what's already there.
   const reposByGroup = new Map();
   for (const p of projects) {
     const key = p.groupId || '';
@@ -473,12 +473,12 @@ function openAddRepoModal(groups, projects, onDone) {
   function modalHtml() {
     return `
       <div class="modal">
-        <h3>Adicionar repositório(s)</h3>
-        <p>Selecione uma pasta que já é um repositório Git, <strong>ou</strong> uma pasta que contenha vários repositórios (todos serão detectados de uma vez). Você pode repetir a seleção quantas vezes quiser antes de confirmar.</p>
+        <h3>Add repository(ies)</h3>
+        <p>Select a folder that is already a Git repository, <strong>or</strong> a folder holding several repositories (all of them are detected at once). You can repeat the selection as many times as you like before confirming.</p>
         <div class="form-group">
-          <label>Grupo (opcional, aplicado a todos)</label>
+          <label>Group (optional, applied to all)</label>
           <div class="combo">
-            <input type="text" id="group-input" autocomplete="off" placeholder="Selecionar grupo existente ou digitar um novo..." value="${escapeHtml(groupText)}">
+            <input type="text" id="group-input" autocomplete="off" placeholder="Pick an existing group or type a new one..." value="${escapeHtml(groupText)}">
             <div class="combo-suggestions" id="group-suggestions"></div>
           </div>
           <div class="combo-hint" id="group-hint"></div>
@@ -486,13 +486,13 @@ function openAddRepoModal(groups, projects, onDone) {
         <div class="modal-picked-list">
           ${
             picked.length === 0
-              ? '<p class="hint">Nenhuma pasta selecionada ainda.</p>'
+              ? '<p class="hint">No folder selected yet.</p>'
               : picked
                   .map(
                     (p, i) => `
             <div class="modal-picked-item">
               <span class="path">${escapeHtml(p)}</span>
-              <button class="icon-btn" data-remove-index="${i}" title="Remover">✕</button>
+              <button class="icon-btn" data-remove-index="${i}" title="Remove">✕</button>
             </div>
           `
                   )
@@ -500,18 +500,18 @@ function openAddRepoModal(groups, projects, onDone) {
           }
         </div>
         <div class="modal-actions" style="justify-content: space-between;">
-          <button class="btn btn-ghost compact" id="pick-folder-btn">+ Selecionar pasta(s)</button>
+          <button class="btn btn-ghost compact" id="pick-folder-btn">+ Select folder(s)</button>
           <div style="display: flex; gap: 8px;">
-            <button class="btn btn-ghost" data-action="cancel">Cancelar</button>
-            <button class="btn btn-primary" data-action="confirm" ${picked.length === 0 ? 'disabled' : ''}>Adicionar (${picked.length})</button>
+            <button class="btn btn-ghost" data-action="cancel">Cancel</button>
+            <button class="btn btn-primary" data-action="confirm" ${picked.length === 0 ? 'disabled' : ''}>Add (${picked.length})</button>
           </div>
         </div>
       </div>
     `;
   }
 
-  // Atualiza só a lista de sugestões e a dica (sem re-renderizar o modal todo,
-  // pra não perder o foco do input enquanto o usuário digita).
+  // Updates only the suggestion list and the hint (without re-rendering the whole
+  // modal, so the input keeps focus while the user types).
   function updateGroupUI() {
     const suggestionsEl = overlay.querySelector('#group-suggestions');
     const hintEl = overlay.querySelector('#group-hint');
@@ -523,7 +523,7 @@ function openAddRepoModal(groups, projects, onDone) {
         const repos = reposByGroup.get(g.id) || [];
         const sub =
           repos.length === 0
-            ? 'grupo vazio'
+            ? 'empty group'
             : repos.slice(0, 3).join(', ') + (repos.length > 3 ? ` +${repos.length - 3}` : '');
         return `
           <div class="combo-item ${g.id === selectedGroupId ? 'selected' : ''}" data-group-id="${g.id}">
@@ -537,14 +537,14 @@ function openAddRepoModal(groups, projects, onDone) {
     const q = groupText.trim();
     const em = exactMatch();
     if (!q) {
-      hintEl.textContent = 'Sem grupo. Selecione um existente ou digite para criar um novo.';
+      hintEl.textContent = 'No group. Pick an existing one or type to create a new one.';
       hintEl.className = 'combo-hint';
     } else if (em) {
       const n = (reposByGroup.get(em.id) || []).length;
-      hintEl.textContent = `Adicionar ao grupo existente "${em.label}" (${n} repo(s) hoje).`;
+      hintEl.textContent = `Add to the existing group "${em.label}" (${n} repo(s) today).`;
       hintEl.className = 'combo-hint exists';
     } else {
-      hintEl.textContent = `Nenhum grupo com esse nome — será criado um novo grupo "${q}".`;
+      hintEl.textContent = `No group with that name — a new group "${q}" will be created.`;
       hintEl.className = 'combo-hint create';
     }
   }
@@ -556,7 +556,7 @@ function openAddRepoModal(groups, projects, onDone) {
     wire();
   }
 
-  // Resolve o groupId final: sugestão clicada > grupo com nome exato > cria novo.
+  // Resolves the final groupId: clicked suggestion > group with the exact name > create a new one.
   async function resolveGroupId() {
     const q = groupText.trim();
     if (!q) return '';
@@ -580,7 +580,7 @@ function openAddRepoModal(groups, projects, onDone) {
       updateGroupUI();
     });
 
-    // mousedown (não click) pra selecionar antes do blur do input.
+    // mousedown (not click) to select before the input blurs.
     suggestionsEl.addEventListener('mousedown', (e) => {
       const item = e.target.closest('[data-group-id]');
       if (!item) return;
@@ -606,13 +606,13 @@ function openAddRepoModal(groups, projects, onDone) {
         }
         if (rejected.length > 0) {
           const names = rejected.map((p) => p.split('/').filter(Boolean).pop() || p).join(', ');
-          toastError('Pasta(s) ignorada(s)', `Não é um repositório Git nem contém repositórios Git: ${names}`);
+          toastError('Folder(s) skipped', `Not a Git repository and holds no Git repositories: ${names}`);
         }
         if (addedCount > 0) {
-          toastSuccess(`${addedCount} repositório(s) encontrado(s)`);
+          toastSuccess(`${addedCount} repository(ies) found`);
         }
       } catch (err) {
-        toastError('Erro ao abrir o seletor de pastas', err.message);
+        toastError('Error opening the folder picker', err.message);
       }
       rerender();
     });
@@ -636,7 +636,7 @@ function openAddRepoModal(groups, projects, onDone) {
         try {
           groupId = await resolveGroupId();
         } catch (err) {
-          toastError('Erro ao definir o grupo', err.message);
+          toastError('Error setting the group', err.message);
           return;
         }
         let successCount = 0;
@@ -645,10 +645,10 @@ function openAddRepoModal(groups, projects, onDone) {
             await api.addProject({ path: p, groupId });
             successCount++;
           } catch (err) {
-            toastError(`Erro ao adicionar ${p}`, err.message);
+            toastError(`Error adding ${p}`, err.message);
           }
         }
-        if (successCount > 0) toastSuccess(`${successCount} repositório(s) adicionado(s)`);
+        if (successCount > 0) toastSuccess(`${successCount} repository(ies) added`);
         overlay.remove();
         onDone();
       });
@@ -661,20 +661,20 @@ function openAddRepoModal(groups, projects, onDone) {
   wire();
 }
 
-// Card minimalista: só a cor do status (dot) e o nome. Os detalhes (branch,
-// alterações, ahead/behind, caminho) ficam no painel da direita ao clicar. O
-// caminho completo fica no tooltip; as ações (renomear/remover) só no hover.
+// A minimal card: just the status color (dot) and the name. The details (branch,
+// changes, ahead/behind, path) live in the right panel on click. The full
+// path is in the tooltip; the actions (rename/remove) only on hover.
 function renderCard(p, selectedPath) {
   const active = p.path === selectedPath;
   const statusTitle =
-    `${p.currentBranch}` + (p.statusSummary && p.statusSummary !== 'Limpo' ? ` • ${p.statusSummary}` : '');
+    `${p.currentBranch}` + (p.statusSummary && p.statusSummary !== 'Clean' ? ` • ${p.statusSummary}` : '');
   return `
     <div class="project-card ${active ? 'active' : ''}" data-path="${escapeHtml(p.path)}" draggable="true" title="${escapeHtml(p.path + ' — ' + statusTitle)}">
       <span class="status-dot ${statusClass(p)}" title="${escapeHtml(statusTitle)}"></span>
       <span class="project-card-name">${escapeHtml(p.name)}</span>
       <span class="project-card-menu">
-        <button class="icon-btn" data-action="rename" data-path="${escapeHtml(p.path)}" title="Renomear">✎</button>
-        <button class="icon-btn" data-action="remove" data-path="${escapeHtml(p.path)}" title="Remover">🗑</button>
+        <button class="icon-btn" data-action="rename" data-path="${escapeHtml(p.path)}" title="Rename">✎</button>
+        <button class="icon-btn" data-action="remove" data-path="${escapeHtml(p.path)}" title="Remove">🗑</button>
       </span>
     </div>
   `;

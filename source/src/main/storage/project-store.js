@@ -4,8 +4,8 @@ const os = require('os');
 
 const LEGACY_REPOS_TXT = path.join(os.homedir(), '.git-manager', 'repos.txt');
 
-// Replica o split(regex, limit) do Java: no máximo `limit-1` cortes, o resto
-// (incluindo separadores literais) fica inteiro no último elemento.
+// Mirrors Java's split(regex, limit): at most `limit-1` cuts, the rest
+// (literal separators included) stays whole in the last element.
 function splitLimit(str, sep, limit) {
   const parts = [];
   let rest = str;
@@ -19,8 +19,8 @@ function splitLimit(str, sep, limit) {
   return parts;
 }
 
-// Replica o unescape do Java: uma barra invertida seguida de char desconhecido
-// é descartada (não é um bug nosso, é o formato legado que estamos lendo).
+// Mirrors Java's unescape: a backslash followed by an unknown char is
+// dropped (it isn't our bug, it's the legacy format we are reading).
 function unescapeLegacy(value) {
   let result = '';
   for (let i = 0; i < value.length; i++) {
@@ -31,7 +31,7 @@ function unescapeLegacy(value) {
         i++;
         continue;
       }
-      continue; // descarta a barra, char seguinte é processado na próxima iteração
+      continue; // drop the backslash; the next char is handled on the next iteration
     }
     result += value[i];
   }
@@ -80,7 +80,7 @@ function createProjectStore(storeFilePath) {
   function add({ name, path: repoPath, group, groupId, notes }) {
     const projects = load();
     if (projects.some((p) => p.path === repoPath)) {
-      throw new Error('Este diretório já está cadastrado.');
+      throw new Error('This directory is already registered.');
     }
     const project = { name, path: repoPath, group: group || '', groupId: groupId || '', notes: notes || '' };
     projects.push(project);
@@ -88,8 +88,8 @@ function createProjectStore(storeFilePath) {
     return project;
   }
 
-  // Move todos os projetos de um grupo para outro (ou pra "sem grupo" se
-  // toGroupId for vazio). Usado quando um grupo é dissolvido/removido.
+  // Moves every project from one group to another (or to "no group" if
+  // toGroupId is empty). Used when a group is dissolved/removed.
   function reassignGroup(fromGroupId, toGroupId) {
     const projects = load();
     let changed = false;
@@ -105,7 +105,7 @@ function createProjectStore(storeFilePath) {
   function update(repoPath, updates) {
     const projects = load();
     const index = projects.findIndex((p) => p.path === repoPath);
-    if (index === -1) throw new Error('Projeto não encontrado.');
+    if (index === -1) throw new Error('Project not found.');
     projects[index] = { ...projects[index], ...updates, path: repoPath };
     save(projects);
     return projects[index];

@@ -12,9 +12,9 @@ async function listValidatedProjects() {
   return Promise.all(projects.map((p) => gitService.validateProject(p)));
 }
 
-// Converte o antigo campo `group` (string plana) de projetos existentes em
-// grupos de topo no novo modelo hierárquico, atribuindo `groupId`. Roda uma
-// única vez: projetos que já têm `groupId` são ignorados.
+// Converts the old `group` field (a flat string) of existing projects into
+// top-level groups in the new hierarchical model, assigning `groupId`. Runs only
+// once: projects that already have a `groupId` are skipped.
 function migrateLegacyGroups() {
   const projects = projectStore.load();
   const pending = projects.filter((p) => !p.groupId && p.group && p.group.trim());
@@ -38,7 +38,7 @@ function registerIpcHandlers() {
   try {
     migrateLegacyGroups();
   } catch (err) {
-    console.error('Falha ao migrar grupos legados:', err);
+    console.error('Failed to migrate legacy groups:', err);
   }
 
   ipcMain.handle('groups-list', () => groupStore.load());
@@ -54,9 +54,9 @@ function registerIpcHandlers() {
   ipcMain.handle('projects-list', () => listValidatedProjects());
 
   ipcMain.handle('projects-add', async (_event, { name, path: repoPath, group, groupId, notes }) => {
-    if (!repoPath) throw new Error('Nenhum diretório informado.');
+    if (!repoPath) throw new Error('No directory given.');
     if (!(await gitService.isValidGitRepo(repoPath))) {
-      throw new Error('O diretório selecionado não contém um repositório Git válido (.git).');
+      throw new Error('The selected directory does not contain a valid Git repository (.git).');
     }
     const finalName = name && name.trim() ? name.trim() : path.basename(repoPath);
     const project = projectStore.add({ name: finalName, path: repoPath, group, groupId, notes });
@@ -77,10 +77,10 @@ function registerIpcHandlers() {
     const result = await dialog.showOpenDialog({ properties: ['openDirectory', 'multiSelections'] });
     if (result.canceled) return { repos: [], rejected: [] };
 
-    // Para cada pasta escolhida, resolve os repos Git que ela representa (a
-    // própria pasta se for um repo, ou os repos nos subdiretórios imediatos).
-    // Só repositórios Git válidos são retornados; o resto vira "rejected" pra
-    // avisar o usuário. Isso garante multi-seleção confiável e validação.
+    // For each chosen folder, resolves the Git repos it stands for (the folder
+    // itself if it is a repo, or the repos in its immediate subdirectories).
+    // Only valid Git repositories are returned; the rest become "rejected" to
+    // warn the user. This makes multi-selection and validation reliable.
     const repos = [];
     const rejected = [];
     for (const selected of result.filePaths) {

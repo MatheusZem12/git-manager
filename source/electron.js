@@ -2,7 +2,7 @@ const { app, BrowserWindow, Menu } = require('electron');
 const path = require('path');
 const { registerIpcHandlers } = require('./src/main/ipc-handlers');
 
-// Remove a barra de menu nativa (File/Edit/View/...). O app tem UI própria.
+// Removes the native menu bar (File/Edit/View/...). The app has its own UI.
 Menu.setApplicationMenu(null);
 
 function createWindow() {

@@ -4,7 +4,7 @@ const simpleGit = require('simple-git');
 
 function git(repoPath) {
   if (!fs.existsSync(repoPath)) {
-    throw new Error(`Diretório não encontrado: ${repoPath}`);
+    throw new Error(`Directory not found: ${repoPath}`);
   }
   return simpleGit(repoPath);
 }
@@ -18,14 +18,14 @@ async function isValidGitRepo(repoPath) {
   }
 }
 
-// Dado um diretório escolhido pelo usuário, resolve para a lista de repositórios
-// Git que ele representa:
-//   - se o próprio diretório é um repo, retorna [ele];
-//   - senão, varre os subdiretórios imediatos (1 nível) e retorna todos os que
-//     forem repos Git.
-// É assim que "selecionar vários de uma vez" funciona de forma confiável no
-// Linux: o usuário escolhe uma pasta-pai e todos os repos dentro dela entram
-// juntos, sem depender do multi-select nativo do SO (que é quebrado pra pastas).
+// Given a directory chosen by the user, resolves the list of Git repositories
+// it stands for:
+//   - if the directory itself is a repo, returns [it];
+//   - otherwise, scans the immediate subdirectories (1 level) and returns every one
+//     that is a Git repo.
+// This is how "select several at once" works reliably on Linux: the user
+// picks a parent folder and every repo inside it comes in together, without
+// relying on the OS's native multi-select (which is broken for folders).
 async function findGitReposUnder(dir) {
   if (await isValidGitRepo(dir)) return [dir];
 
@@ -51,7 +51,7 @@ async function validateProject(project) {
     existsOnDisk: false,
     hasGit: false,
     currentBranch: 'N/A',
-    statusSummary: 'Diretório não encontrado',
+    statusSummary: 'Directory not found',
     ahead: 0,
     behind: 0,
     available: false
@@ -61,7 +61,7 @@ async function validateProject(project) {
   result.existsOnDisk = true;
 
   if (!(await isValidGitRepo(project.path))) {
-    result.statusSummary = 'Sem repositório git';
+    result.statusSummary = 'No git repository';
     return result;
   }
   result.hasGit = true;
@@ -69,12 +69,12 @@ async function validateProject(project) {
   try {
     const status = await git(project.path).status();
     result.currentBranch = status.current || 'HEAD destacada';
-    result.statusSummary = status.files.length > 0 ? `${status.files.length} alteração(ões)` : 'Limpo';
+    result.statusSummary = status.files.length > 0 ? `${status.files.length} change(s)` : 'Clean';
     result.ahead = status.ahead || 0;
     result.behind = status.behind || 0;
   } catch {
-    result.currentBranch = 'Erro';
-    result.statusSummary = 'Erro';
+    result.currentBranch = 'Error';
+    result.statusSummary = 'Error';
   }
 
   result.available = result.existsOnDisk && result.hasGit;
@@ -95,7 +95,7 @@ async function getStatus(repoPath) {
   const remote = await getRemoteUrl(repoPath);
   return {
     branch: status.current || 'HEAD destacada',
-    summary: status.files.length > 0 ? `${status.files.length} alteração(ões)` : 'Limpo',
+    summary: status.files.length > 0 ? `${status.files.length} change(s)` : 'Clean',
     head: status.current || '',
     remote: remote || ''
   };
@@ -125,15 +125,15 @@ async function getBranches(repoPath) {
 }
 
 async function getCommits(repoPath, limit = 50) {
-  // Formato custom pra obter também os hashes dos pais (%P) e as refs/decorações
-  // (%D) — necessários pra montar o grafo do histórico. Campos separados por
-  // Unit Separator (0x1f) e commits por linha (%s é só o assunto, sem quebras).
+  // A custom format to also get the parent hashes (%P) and the refs/decorations
+  // (%D) — needed to build the history graph. Fields are separated by the
+  // Unit Separator (0x1f) and commits by line (%s is just the subject, no line breaks).
   const SEP = '\x1f';
   const fmt = ['%H', '%h', '%P', '%an', '%ae', '%ad', '%D', '%s'].join(SEP);
   const out = await git(repoPath).raw([
     'log',
     `--max-count=${limit}`,
-    '--topo-order', // pais sempre abaixo dos filhos: grafo estável, sem cruzar colunas por data
+    '--topo-order', // parents always below children: a stable graph, no columns crossing by date
     '--date=iso',
     `--pretty=format:${fmt}`
   ]);
@@ -283,7 +283,7 @@ async function getFileContentAtHead(repoPath, filePath) {
 async function getFileDiff(repoPath, filePath, staged) {
   const args = staged ? ['diff', '--cached', '--', filePath] : ['diff', '--', filePath];
   const out = await git(repoPath).raw(args);
-  return out || 'Nenhuma alteração detectada.';
+  return out || 'No changes detected.';
 }
 
 module.exports = {

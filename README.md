@@ -1,93 +1,93 @@
 # Git Manager
 
-Gerenciador local de repositórios Git com **Electron + Node.js**. Um único processo, sem API REST, sem backend separado: a UI fala direto com o Git do seu sistema através do módulo principal do Electron.
+A local Git repository manager built with **Electron + Node.js**. A single process, with no REST API and no separate backend: the UI talks straight to your system's Git through Electron's main process.
 
-## Como funciona
+## How it works
 
-1. Você cadastra repositórios já existentes no disco (seleção de pastas, pode adicionar várias de uma vez).
-2. O dashboard mostra os projetos organizados em **grupos e subgrupos** — arraste repositórios e grupos para reorganizar — com busca, estatísticas e status (limpo / com alterações / indisponível) de cada um.
-3. Ao selecionar um projeto, você tem abas para: visão geral (branch, sync, push/pull/fetch), commit (stage/unstage com diff colorido), histórico (em gráfico de branches ou lista), tags e stash. Cada repositório também pode ser renomeado ou removido direto pelo cartão.
+1. You register repositories that already exist on disk (folder selection; you can add several at once).
+2. The dashboard shows the projects organized in **groups and subgroups** — drag repositories and groups to rearrange them — with search, stats and the status of each one (clean / with changes / unavailable).
+3. When you select a project, you get tabs for: overview (branch, sync, push/pull/fetch), commit (stage/unstage with a colored diff), history (as a branch graph or a list), tags and stash. Each repository can also be renamed or removed straight from its card.
 
-Se você já usava a versão antiga (Java + Flutter), seus repositórios cadastrados em `~/.git-manager/repos.txt` são **migrados automaticamente** na primeira execução — nada precisa ser recadastrado.
+If you used the old version (Java + Flutter), the repositories registered in `~/.git-manager/repos.txt` are **migrated automatically** on the first run — nothing needs to be registered again.
 
-## Requisitos
+## Requirements
 
 - Node.js 18+
 - npm 9+
-- `git` instalado e no PATH (o app usa o binário do sistema — herda sua configuração de SSH, credenciais e `~/.gitconfig` normalmente)
+- `git` installed and on the PATH (the app uses the system binary — it inherits your SSH setup, credentials and `~/.gitconfig` as usual)
 
-## Estrutura do projeto
+## Project layout
 
-- `source/` — todo o código do app (Electron + Node.js)
-- `README.md`, `start.sh`, `install-desktop.sh` — documentação e scripts, na raiz
+- `source/` — all of the app code (Electron + Node.js)
+- `README.md`, `start.sh`, `install-desktop.sh` — docs and scripts, at the root
 
 ```
 source/
-├── electron.js              # Entry point do processo principal
-├── preload.js                # Ponte segura entre main e renderer
+├── electron.js              # Main process entry point
+├── preload.js                # Safe bridge between main and renderer
 ├── src/
 │   ├── main/
-│   │   ├── ipc-handlers.js   # Registro central dos handlers IPC
+│   │   ├── ipc-handlers.js   # Central registry of IPC handlers
 │   │   ├── git/
-│   │   │   └── git-service.js    # Todas as operações Git (via simple-git)
+│   │   │   └── git-service.js    # Every Git operation (via simple-git)
 │   │   └── storage/
-│   │       ├── project-store.js  # Persistência dos projetos cadastrados
-│   │       └── group-store.js    # Grupos e subgrupos (hierárquicos)
+│   │       ├── project-store.js  # Persistence of registered projects
+│   │       └── group-store.js    # Groups and subgroups (hierarchical)
 │   └── renderer/
 │       ├── index.html
 │       ├── styles.css
 │       ├── app.js
 │       ├── screens/
-│       │   ├── dashboard-screen.js       # Sidebar: lista, busca, grupos aninhados, drag & drop
-│       │   ├── project-detail-screen.js  # Abas: visão geral, histórico (gráfico/lista), tags, stash
-│       │   └── staging-tab.js            # Aba de commit: stage/unstage + diff
+│       │   ├── dashboard-screen.js       # Sidebar: list, search, nested groups, drag & drop
+│       │   ├── project-detail-screen.js  # Tabs: overview, history (graph/list), tags, stash
+│       │   └── staging-tab.js            # Commit tab: stage/unstage + diff
 │       └── services/
-│           ├── git-api.js    # Wrapper fino sobre window.gitManagerAPI
-│           ├── dialogs.js    # Diálogos de confirmação/input
-│           └── toast.js      # Notificações
+│           ├── git-api.js    # Thin wrapper over window.gitManagerAPI
+│           ├── dialogs.js    # Confirm/input dialogs
+│           └── toast.js      # Notifications
 ```
 
-## Como executar
+## Running
 
 ```bash
 cd source
 npm install
-npm start        # ou ./start.sh (na raiz do projeto)
+npm start        # or ./start.sh (at the project root)
 ```
 
-### Instalar como app do desktop (Linux)
+### Install as a desktop app (Linux)
 
-Para criar um atalho no menu de aplicativos, com ícone:
+To create a launcher in the applications menu, with an icon:
 
 ```bash
-./install-desktop.sh              # instala/atualiza o atalho
-./install-desktop.sh --uninstall  # remove
+./install-desktop.sh              # installs/updates the launcher
+./install-desktop.sh --uninstall  # removes it
 ```
 
-## Funcionalidades
+## Features
 
-- Cadastro de repositórios (múltiplos de uma vez), organização em **grupos e subgrupos** (aninhados) com **arrastar-e-soltar** para mover repositórios e grupos, e busca por nome ou caminho
-- Renomear e remover repositórios direto pelo cartão
-- Dashboard com estatísticas (total / OK / com alterações / indisponível)
-- Visão geral: branch atual, HEAD, troca de branch, nova branch, push/pull/fetch com log de saída
-- Commit: stage/unstage individual ou em lote, diff unificado colorido (linhas adicionadas/removidas), visualização do arquivo completo, commit dos arquivos staged
-- Histórico da branch em duas visões: **gráfico de commits** (lanes coloridas mostrando branches e merges) ou lista
-- Tags: criar (anotada se tiver mensagem, leve se não) e excluir
-- Stash: salvar, aplicar, pop, listar
+- Register repositories (several at once), organize them in nested **groups and subgroups** with **drag and drop** to move repositories and groups, and search by name or path
+- Rename and remove repositories straight from the card
+- A dashboard with stats (total / OK / with changes / unavailable)
+- Overview: current branch, HEAD, switch branch, new branch, push/pull/fetch with an output log
+- Commit: stage/unstage one by one or in bulk, a colored unified diff (added/removed lines), a full-file view, commit of the staged files
+- Branch history in two views: a **commit graph** (colored lanes showing branches and merges) or a list
+- Tags: create (annotated if it has a message, lightweight if not) and delete
+- Stash: save, apply, pop, list
 
-### Fora do escopo desta versão
+### Out of scope for this version
 
-Para manter a reescrita enxuta, ficaram de fora (podem ser adicionados depois, se fizerem falta):
+To keep the rewrite lean, these were left out (they can be added later if missed):
 
-- Tela de merge/PR-like (merge preview, squash, resolução de conflitos assistida)
-- Wizard de configuração de SSH (o push/pull/fetch funciona normalmente usando a configuração de SSH já existente no seu sistema)
-- Internacionalização (só português)
+- A merge/PR-like screen (merge preview, squash, assisted conflict resolution)
+- An SSH setup wizard (push/pull/fetch work normally with the SSH setup already on your system)
+- Internationalization (English only)
 
-## Persistência
+## Persistence
 
-Os projetos cadastrados ficam em um JSON na pasta de dados do usuário (`userData` do Electron) — não em `~/.git-manager/repos.txt` (esse arquivo só é lido uma vez, para migração, e nunca mais é tocado).
+Registered projects live in a JSON file in the user data folder (Electron's `userData`) — not in `~/.git-manager/repos.txt` (that file is read only once, for the migration, and never touched again).
 
-## Notas técnicas
+## Technical notes
 
-- Operações Git usam a lib [`simple-git`](https://www.npmjs.com/package/simple-git), que executa o binário `git` do sistema — SSH, credenciais e configurações globais funcionam exatamente como na linha de comando.
-- Delete de branch é seguro por padrão (recusa branches não mescladas); force-delete existe na camada de serviço mas não tem UI dedicada ainda.
+- Git operations use the [`simple-git`](https://www.npmjs.com/package/simple-git) library, which runs the system `git` binary — SSH, credentials and global settings work exactly as on the command line.
+- Branch deletion is safe by default (it refuses unmerged branches); force-delete exists in the service layer but has no dedicated UI yet.

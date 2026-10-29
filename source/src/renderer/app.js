@@ -5,9 +5,9 @@ const sidebar = document.getElementById('sidebar');
 const content = document.getElementById('content');
 const appEl = document.getElementById('app');
 
-// Botão persistente (fora do conteúdo re-renderizado) que reexibe a barra
-// lateral quando ela está recolhida. O botão de recolher fica no header da
-// barra e é reconectado a cada render em dashboard-screen.
+// A persistent button (outside the re-rendered content) that shows the sidebar
+// again when it is collapsed. The collapse button lives in the sidebar
+// header and is rewired on every render in dashboard-screen.
 document
   .getElementById('expand-sidebar-btn')
   .addEventListener('click', () => appEl.classList.remove('sidebar-collapsed'));

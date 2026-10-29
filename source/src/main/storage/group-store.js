@@ -1,10 +1,10 @@
 const fs = require('fs');
 const path = require('path');
 
-// Grupos são hierárquicos: cada grupo tem um `parentId` (null = topo), o que
-// permite subgrupos aninhados em qualquer profundidade. Ficam num arquivo
-// próprio (não junto dos projetos) pra que grupos vazios persistam — o usuário
-// pode criar um grupo e só depois arrastar repositórios pra dentro dele.
+// Groups are hierarchical: each group has a `parentId` (null = top level), which
+// allows subgroups nested to any depth. They live in their own file (not
+// alongside the projects) so that empty groups persist — the user can create
+// a group and only later drag repositories into it.
 
 function genId() {
   return 'g_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -14,7 +14,7 @@ function parentMap(groups) {
   return new Map(groups.map((g) => [g.id, g.parentId || null]));
 }
 
-// true se `nodeId` é o próprio `ancestorId` ou está abaixo dele na árvore.
+// true if `nodeId` is `ancestorId` itself or sits below it in the tree.
 function isSelfOrDescendant(groups, ancestorId, nodeId) {
   const parentOf = parentMap(groups);
   let cur = nodeId;
@@ -29,9 +29,9 @@ function normalizeName(name) {
   return (name || '').trim().toLowerCase();
 }
 
-// true se já existe outro grupo com esse nome sob o mesmo pai (comparação sem
-// diferenciar maiúsculas/minúsculas). `exceptId` ignora o próprio grupo (usado
-// ao renomear). Nomes iguais são permitidos em pais diferentes.
+// true if another group with this name already exists under the same parent
+// (case-insensitive). `exceptId` skips the group itself (used when
+// renaming). Equal names are allowed under different parents.
 function siblingNameTaken(groups, parentId, name, exceptId = null) {
   const target = normalizeName(name);
   const pid = parentId || null;
@@ -58,14 +58,14 @@ function createGroupStore(storeFilePath) {
 
   function add({ name, parentId }) {
     const finalName = (name || '').trim();
-    if (!finalName) throw new Error('O nome do grupo não pode ser vazio.');
+    if (!finalName) throw new Error('The group name cannot be empty.');
     const groups = load();
     const pid = parentId || null;
     if (pid && !groups.some((g) => g.id === pid)) {
-      throw new Error('Grupo pai não encontrado.');
+      throw new Error('Parent group not found.');
     }
     if (siblingNameTaken(groups, pid, finalName)) {
-      throw new Error(`Já existe um grupo chamado "${finalName}" aqui.`);
+      throw new Error(`A group named "${finalName}" already exists here.`);
     }
     const group = { id: genId(), name: finalName, parentId: pid };
     groups.push(group);
@@ -75,12 +75,12 @@ function createGroupStore(storeFilePath) {
 
   function rename(id, name) {
     const finalName = (name || '').trim();
-    if (!finalName) throw new Error('O nome do grupo não pode ser vazio.');
+    if (!finalName) throw new Error('The group name cannot be empty.');
     const groups = load();
     const group = groups.find((g) => g.id === id);
-    if (!group) throw new Error('Grupo não encontrado.');
+    if (!group) throw new Error('Group not found.');
     if (siblingNameTaken(groups, group.parentId || null, finalName, id)) {
-      throw new Error(`Já existe um grupo chamado "${finalName}" aqui.`);
+      throw new Error(`A group named "${finalName}" already exists here.`);
     }
     group.name = finalName;
     save(groups);
@@ -90,28 +90,28 @@ function createGroupStore(storeFilePath) {
   function reparent(id, parentId) {
     const groups = load();
     const group = groups.find((g) => g.id === id);
-    if (!group) throw new Error('Grupo não encontrado.');
+    if (!group) throw new Error('Group not found.');
     const pid = parentId || null;
     if (pid) {
-      if (!groups.some((g) => g.id === pid)) throw new Error('Grupo pai não encontrado.');
-      // Impede criar ciclos (mover um grupo pra dentro de si mesmo ou de um
-      // descendente seu).
+      if (!groups.some((g) => g.id === pid)) throw new Error('Parent group not found.');
+      // Prevents cycles (moving a group into itself or into one of its
+      // descendants).
       if (isSelfOrDescendant(groups, id, pid)) {
-        throw new Error('Não é possível mover um grupo para dentro de si mesmo.');
+        throw new Error('A group cannot be moved into itself.');
       }
     }
-    // Mover para um pai que já tem um filho com o mesmo nome criaria duplicata.
+    // Moving to a parent that already has a child with the same name would create a duplicate.
     if (siblingNameTaken(groups, pid, group.name, id)) {
-      throw new Error(`Já existe um grupo chamado "${group.name}" no destino.`);
+      throw new Error(`A group named "${group.name}" already exists at the destination.`);
     }
     group.parentId = pid;
     save(groups);
     return group;
   }
 
-  // Remove um grupo "dissolvendo-o": os subgrupos e (via project-store) os
-  // repositórios diretos dele sobem para o grupo pai. Retorna para onde as
-  // coisas foram reatribuídas, pra que o chamador reatribua os projetos.
+  // Removes a group by "dissolving" it: its subgroups and (via project-store) its
+  // direct repositories move up to the parent group. Returns where things were
+  // reassigned to, so the caller can reassign the projects.
   function remove(id) {
     const groups = load();
     const target = groups.find((g) => g.id === id);

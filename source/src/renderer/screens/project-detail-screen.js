@@ -4,9 +4,9 @@ import { toastSuccess, toastError } from '../services/toast.js';
 import { renderStagingTab } from './staging-tab.js';
 
 const TABS = [
-  { id: 'overview', label: 'Visão Geral' },
+  { id: 'overview', label: 'Overview' },
   { id: 'commit', label: 'Commit' },
-  { id: 'history', label: 'Histórico' },
+  { id: 'history', label: 'History' },
   { id: 'tags', label: 'Tags' },
   { id: 'stash', label: 'Stash' }
 ];
@@ -15,7 +15,7 @@ const tabState = new Map();
 const outputLog = new Map();
 const historyView = new Map(); // repoPath -> 'graph' | 'list'
 
-// Parâmetros do grafo de histórico
+// History graph parameters
 const GRAPH_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#06b6d4', '#ec4899', '#a78bfa', '#ef4444', '#84cc16'];
 const ROW_H = 34;
 const COL_W = 16;
@@ -27,10 +27,10 @@ function laneColor(colorId) {
   return GRAPH_COLORS[((colorId % n) + n) % n];
 }
 
-// Escolhe um índice de cor pra uma linha de branch nova. Prefere uma cor da
-// paleta que não esteja em uso por nenhuma lane ativa (evita duas branches
-// vizinhas com a mesma cor); se todas as 8 estiverem ocupadas, cai num
-// contador rotativo. `counter` é passado por referência via objeto.
+// Picks a color index for a new branch line. It prefers a palette color
+// that no active lane is using (avoids two neighboring branches with the
+// same color); if all 8 are taken, it falls back to a rotating counter.
+// `counter` is passed by reference through an object.
 function allocColor(laneColors, counter) {
   const used = new Set();
   for (const c of laneColors) {
@@ -66,7 +66,7 @@ export function renderWelcome(container) {
     <div class="welcome">
       <div>
         <div class="welcome-icon">⑂</div>
-        <div>Selecione um repositório à esquerda</div>
+        <div>Select a repository on the left</div>
       </div>
     </div>
   `;
@@ -81,7 +81,7 @@ export async function renderProjectDetail(container, repoPath, onRemoved, onRefr
       <h2>${escapeHtml(projectName)}</h2>
       <span class="detail-path">${escapeHtml(repoPath)}</span>
       <span class="spacer"></span>
-      <button class="btn btn-ghost compact" id="refresh-btn">⟳ Atualizar</button>
+      <button class="btn btn-ghost compact" id="refresh-btn">⟳ Refresh</button>
     </div>
     <div class="tabs">
       ${TABS.map(
@@ -100,8 +100,8 @@ export async function renderProjectDetail(container, repoPath, onRemoved, onRefr
     });
   });
 
-  // "Atualizar" é o único ponto que re-renderiza tudo: recarrega o painel do
-  // repo atual e também a nav (re-valida o status de todos os repos).
+  // "Refresh" is the only place that re-renders everything: it reloads the
+  // current repo's panel and the nav too (re-validates every repo's status).
   container.querySelector('#refresh-btn').addEventListener('click', () => {
     if (onRefreshSidebar) onRefreshSidebar();
     renderProjectDetail(container, repoPath, onRemoved, onRefreshSidebar);
@@ -111,25 +111,25 @@ export async function renderProjectDetail(container, repoPath, onRemoved, onRefr
   if (check && (!check.existsOnDisk || !check.hasGit)) {
     tabBody.innerHTML = `
       <div class="card">
-        <h3>Repositório indisponível</h3>
+        <h3>Repository unavailable</h3>
         <p class="hint">${
           !check.existsOnDisk
-            ? 'A pasta não existe mais nesse caminho.'
-            : 'A pasta existe, mas não contém um repositório Git válido (.git).'
+            ? 'The folder no longer exists at this path.'
+            : 'The folder exists, but holds no valid Git repository (.git).'
         }</p>
         <div class="card-row" style="margin-top: 16px;">
-          <button class="btn btn-danger compact" id="remove-unavailable-btn">Remover da lista</button>
+          <button class="btn btn-danger compact" id="remove-unavailable-btn">Remove from list</button>
         </div>
       </div>
     `;
     tabBody.querySelector('#remove-unavailable-btn').addEventListener('click', async () => {
       const ok = await confirmDialog({
-        title: 'Remover projeto',
-        message: `Remover "${projectName}" da lista? Isso não apaga nada do disco.`
+        title: 'Remove project',
+        message: `Remove "${projectName}" from the list? This deletes nothing from disk.`
       });
       if (!ok) return;
       await api.removeProject(repoPath);
-      toastSuccess('Projeto removido');
+      toastSuccess('Project removed');
       if (onRemoved) onRemoved();
     });
     return;
@@ -154,7 +154,7 @@ export async function renderProjectDetail(container, repoPath, onRemoved, onRefr
         break;
     }
   } catch (err) {
-    tabBody.innerHTML = `<div class="card">Erro ao carregar: ${escapeHtml(err.message)}</div>`;
+    tabBody.innerHTML = `<div class="card">Error loading: ${escapeHtml(err.message)}</div>`;
   }
 }
 
@@ -172,7 +172,7 @@ async function renderOverviewTab(container, repoPath) {
     <div class="card">
       <div class="card-row" style="justify-content: space-between;">
         <div>
-          <div class="hint">Branch atual</div>
+          <div class="hint">Current branch</div>
           <div style="font-size: 20px; font-weight: 700;">${escapeHtml(status.branch)}</div>
         </div>
         <div>
@@ -183,7 +183,7 @@ async function renderOverviewTab(container, repoPath) {
     </div>
 
     <div class="card">
-      <h3>Trocar de branch</h3>
+      <h3>Switch branch</h3>
       <div class="card-row">
         <select id="branch-select" style="flex: 1;">
           ${localBranches
@@ -191,19 +191,19 @@ async function renderOverviewTab(container, repoPath) {
             .join('')}
         </select>
         <button class="btn btn-primary compact" id="checkout-btn">Checkout</button>
-        <button class="btn btn-success compact" id="new-branch-btn">+ Nova branch</button>
+        <button class="btn btn-success compact" id="new-branch-btn">+ New branch</button>
       </div>
     </div>
 
     <div class="card">
-      <h3>Sincronização</h3>
+      <h3>Sync</h3>
       <p class="hint" style="margin-bottom: 12px;">
         ${
           !sync.hasRemote
-            ? 'Nenhum remote configurado.'
+            ? 'No remote configured.'
             : sync.ahead === 0 && sync.behind === 0
-              ? '✓ Atualizado com o remote.'
-              : `${sync.ahead > 0 ? `${sync.ahead} commit(s) à frente` : ''} ${sync.behind > 0 ? `${sync.behind} commit(s) atrás` : ''}`
+              ? '✓ Up to date with the remote.'
+              : `${sync.ahead > 0 ? `${sync.ahead} commit(s) ahead` : ''} ${sync.behind > 0 ? `${sync.behind} commit(s) behind` : ''}`
         }
       </p>
       <div class="card-row">
@@ -215,10 +215,10 @@ async function renderOverviewTab(container, repoPath) {
 
     <div class="card">
       <h3>Output</h3>
-      <div class="terminal" id="terminal">${escapeHtml(logLines.join('\n')) || '(nenhum comando executado ainda)'}</div>
+      <div class="terminal" id="terminal">${escapeHtml(logLines.join('\n')) || '(no command run yet)'}</div>
       <div class="card-row" style="margin-top: 8px;">
-        <button class="btn btn-ghost tiny" id="copy-output-btn">Copiar</button>
-        <button class="btn btn-ghost tiny" id="clear-output-btn">Limpar</button>
+        <button class="btn btn-ghost tiny" id="copy-output-btn">Copy</button>
+        <button class="btn btn-ghost tiny" id="clear-output-btn">Clear</button>
       </div>
     </div>
   `;
@@ -230,24 +230,24 @@ async function renderOverviewTab(container, repoPath) {
     try {
       await api.checkout(repoPath, branch);
       appendLog(repoPath, `$ git checkout ${branch}\nOK`);
-      toastSuccess('Checkout realizado');
+      toastSuccess('Checkout done');
     } catch (err) {
-      appendLog(repoPath, `❌ Erro: ${err.message}`);
-      toastError('Erro no checkout', err.message);
+      appendLog(repoPath, `❌ Error: ${err.message}`);
+      toastError('Checkout error', err.message);
     }
     rerender();
   });
 
   container.querySelector('#new-branch-btn').addEventListener('click', async () => {
-    const name = await promptDialog({ title: 'Nova branch', label: 'Nome da branch' });
+    const name = await promptDialog({ title: 'New branch', label: 'Branch name' });
     if (!name) return;
     try {
       await api.createBranch(repoPath, name);
       appendLog(repoPath, `$ git checkout -b ${name}\nOK`);
-      toastSuccess('Branch criada');
+      toastSuccess('Branch created');
     } catch (err) {
-      appendLog(repoPath, `❌ Erro: ${err.message}`);
-      toastError('Erro ao criar branch', err.message);
+      appendLog(repoPath, `❌ Error: ${err.message}`);
+      toastError('Error creating branch', err.message);
     }
     rerender();
   });
@@ -258,7 +258,7 @@ async function renderOverviewTab(container, repoPath) {
 
   container.querySelector('#copy-output-btn').addEventListener('click', () => {
     navigator.clipboard.writeText(logLines.join('\n'));
-    toastSuccess('Output copiado');
+    toastSuccess('Output copied');
   });
   container.querySelector('#clear-output-btn').addEventListener('click', () => {
     outputLog.set(repoPath, []);
@@ -269,38 +269,38 @@ async function renderOverviewTab(container, repoPath) {
 async function runSyncAction(repoPath, action, rerender) {
   try {
     await api[action](repoPath);
-    appendLog(repoPath, `$ git ${action}\nOK: concluído.`);
-    toastSuccess(`${action} concluído`);
+    appendLog(repoPath, `$ git ${action}\nOK: done.`);
+    toastSuccess(`${action} done`);
   } catch (err) {
     let detail = err.message;
     if (/permission denied|publickey/i.test(detail)) {
-      detail += '\nDica: verifique sua chave SSH (~/.ssh) e se ela está configurada no serviço remoto.';
+      detail += '\nTip: check your SSH key (~/.ssh) and whether it is set up on the remote service.';
     }
-    appendLog(repoPath, `$ git ${action}\n❌ Erro: ${detail}`);
-    toastError(`Erro no ${action}`, err.message);
+    appendLog(repoPath, `$ git ${action}\n❌ Error: ${detail}`);
+    toastError(`${action} error`, err.message);
   }
   rerender();
 }
 
 async function renderHistoryTab(container, repoPath) {
-  container.innerHTML = `<div class="card">Carregando...</div>`;
+  container.innerHTML = `<div class="card">Loading...</div>`;
   const commits = await api.getCommits(repoPath, 100);
   const view = historyView.get(repoPath) || 'graph';
 
   container.innerHTML = `
     <div class="card history-card">
       <div class="card-row history-head">
-        <h3 style="margin: 0;">Histórico de commits (branch atual)</h3>
+        <h3 style="margin: 0;">Commit history (current branch)</h3>
         <span style="flex: 1;"></span>
         <div class="seg">
-          <button class="seg-btn ${view === 'graph' ? 'active' : ''}" data-view="graph">⑂ Gráfico</button>
-          <button class="seg-btn ${view === 'list' ? 'active' : ''}" data-view="list">☰ Lista</button>
+          <button class="seg-btn ${view === 'graph' ? 'active' : ''}" data-view="graph">⑂ Graph</button>
+          <button class="seg-btn ${view === 'list' ? 'active' : ''}" data-view="list">☰ List</button>
         </div>
       </div>
       <div class="history-body">
         ${
           commits.length === 0
-            ? '<p class="hint">Nenhum commit ainda.</p>'
+            ? '<p class="hint">No commits yet.</p>'
             : view === 'graph'
               ? renderHistoryGraph(commits)
               : renderHistoryList(commits)
@@ -333,20 +333,20 @@ function renderHistoryList(commits) {
     .join('');
 }
 
-// Atribui uma "lane" (coluna) a cada commit para desenhar o DAG estilo gitk.
-// Percorre os commits (mais novos primeiro); cada lane guarda o hash do próximo
-// commit esperado nela. O primeiro pai continua na mesma lane; pais extras
-// (merges) abrem novas lanes.
+// Assigns a "lane" (column) to each commit to draw a gitk-style DAG.
+// Walks the commits (newest first); each lane holds the hash of the next
+// commit expected on it. The first parent continues on the same lane; extra
+// parents (merges) open new lanes.
 //
-// A COR segue a *linha da branch*, não a coluna: cada lane carrega um `color`
-// persistente (`laneColors`) que nasce quando a linha aparece, é herdado pela
-// continuação do primeiro pai e viaja com a lane. Assim o merge e toda a cadeia
-// da branch de origem ficam com uma única cor, mesmo que mudem de coluna.
+// The COLOR follows the *branch line*, not the column: each lane carries a
+// persistent `color` (`laneColors`) born when the line appears, inherited by
+// the first parent's continuation and traveling with the lane. So the merge and
+// the source branch's whole chain keep a single color, even when they change column.
 function computeGraph(commits) {
   const idToRow = new Map(commits.map((c, i) => [c.id, i]));
-  const lanes = []; // lanes[i] = hash esperado, ou null se livre
-  const laneColors = []; // laneColors[i] = id de cor da branch na lane i (ou null)
-  const counter = { next: 0 }; // fallback quando a paleta toda está em uso
+  const lanes = []; // lanes[i] = expected hash, or null if free
+  const laneColors = []; // laneColors[i] = color id of the branch on lane i (or null)
+  const counter = { next: 0 }; // fallback when the whole palette is in use
   let maxLanes = 1;
   const rows = [];
 
@@ -354,8 +354,8 @@ function computeGraph(commits) {
     let lane = lanes.indexOf(commit.id);
     let color;
     if (lane === -1) {
-      // Nenhuma lane esperava este commit: é um tip de branch (ex.: HEAD na
-      // primeira linha). Abre uma lane com uma cor nova.
+      // No lane was expecting this commit: it is a branch tip (e.g. HEAD on the
+      // first row). Opens a lane with a new color.
       lane = lanes.indexOf(null);
       if (lane === -1) {
         lane = lanes.length;
@@ -365,11 +365,11 @@ function computeGraph(commits) {
       color = allocColor(laneColors, counter);
       laneColors[lane] = color;
     } else {
-      color = laneColors[lane]; // herda a cor da linha que chegou até aqui
+      color = laneColors[lane]; // inherits the color of the line that got here
     }
     lanes[lane] = commit.id;
 
-    // Outras lanes que também esperavam este commit convergem aqui (merge alvo).
+    // Other lanes also expecting this commit converge here (merge target).
     for (let li = 0; li < lanes.length; li++) {
       if (li !== lane && lanes[li] === commit.id) {
         lanes[li] = null;
@@ -383,7 +383,7 @@ function computeGraph(commits) {
       lanes[lane] = null;
       laneColors[lane] = null;
     } else {
-      // Primeiro pai continua na mesma lane com a MESMA cor.
+      // The first parent continues on the same lane with the SAME color.
       lanes[lane] = parents[0];
       parentAssignments.push({ parent: parents[0], lane, color });
       for (let pi = 1; pi < parents.length; pi++) {
@@ -397,7 +397,7 @@ function computeGraph(commits) {
             laneColors.push(null);
           }
           lanes[pl] = parents[pi];
-          pcolor = allocColor(laneColors, counter); // cor dedicada da branch mesclada
+          pcolor = allocColor(laneColors, counter); // a dedicated color for the merged branch
           laneColors[pl] = pcolor;
         } else {
           pcolor = laneColors[pl];
@@ -449,7 +449,7 @@ function renderHistoryGraph(commits) {
       if (x1 === x2) {
         d = `M ${x1} ${y1} L ${x2} ${y2}`;
       } else {
-        // Curva pra lane alvo dentro da primeira linha, depois desce reto.
+        // Curves to the target lane within the first row, then goes straight down.
         const yb = y1 + ROW_H;
         d = `M ${x1} ${y1} C ${x1} ${y1 + ROW_H * 0.45}, ${x2} ${yb - ROW_H * 0.45}, ${x2} ${yb} L ${x2} ${y2}`;
       }
@@ -511,24 +511,24 @@ function renderRefs(refs) {
 }
 
 async function renderTagsTab(container, repoPath) {
-  container.innerHTML = `<div class="card">Carregando...</div>`;
+  container.innerHTML = `<div class="card">Loading...</div>`;
   const tags = await api.getTags(repoPath);
   container.innerHTML = `
     <div class="card">
       <div class="card-row" style="justify-content: space-between; margin-bottom: 12px;">
         <h3 style="margin: 0;">Tags</h3>
-        <button class="btn btn-primary compact" id="new-tag-btn">+ Nova tag</button>
+        <button class="btn btn-primary compact" id="new-tag-btn">+ New tag</button>
       </div>
       ${
         tags.length === 0
-          ? '<p class="hint">Nenhuma tag.</p>'
+          ? '<p class="hint">No tags.</p>'
           : tags
               .map(
                 (t) => `
         <div class="list-item">
           <span>🏷</span>
           <div class="list-item-main"><div class="list-item-title">${escapeHtml(t)}</div></div>
-          <button class="btn btn-danger tiny" data-action="delete-tag" data-name="${escapeHtml(t)}">Excluir</button>
+          <button class="btn btn-danger tiny" data-action="delete-tag" data-name="${escapeHtml(t)}">Delete</button>
         </div>
       `
               )
@@ -538,28 +538,28 @@ async function renderTagsTab(container, repoPath) {
   `;
 
   container.querySelector('#new-tag-btn').addEventListener('click', async () => {
-    const name = await promptDialog({ title: 'Nova tag', label: 'Nome da tag' });
+    const name = await promptDialog({ title: 'New tag', label: 'Tag name' });
     if (!name) return;
-    const message = await promptDialog({ title: 'Mensagem da tag (opcional)', label: 'Mensagem' });
+    const message = await promptDialog({ title: 'Tag message (optional)', label: 'Message' });
     if (message === null) return;
     try {
       await api.createTag(repoPath, name, message);
-      toastSuccess('Tag criada');
+      toastSuccess('Tag created');
     } catch (err) {
-      toastError('Erro ao criar tag', err.message);
+      toastError('Error creating tag', err.message);
     }
     renderTagsTab(container, repoPath);
   });
 
   container.querySelectorAll('[data-action="delete-tag"]').forEach((btn) => {
     btn.addEventListener('click', async () => {
-      const ok = await confirmDialog({ title: 'Excluir tag', message: `Excluir a tag "${btn.dataset.name}"?` });
+      const ok = await confirmDialog({ title: 'Delete tag', message: `Delete the tag "${btn.dataset.name}"?` });
       if (!ok) return;
       try {
         await api.deleteTag(repoPath, btn.dataset.name);
-        toastSuccess('Tag removida');
+        toastSuccess('Tag removed');
       } catch (err) {
-        toastError('Erro ao excluir tag', err.message);
+        toastError('Error deleting tag', err.message);
       }
       renderTagsTab(container, repoPath);
     });
@@ -567,19 +567,19 @@ async function renderTagsTab(container, repoPath) {
 }
 
 async function renderStashTab(container, repoPath) {
-  container.innerHTML = `<div class="card">Carregando...</div>`;
+  container.innerHTML = `<div class="card">Loading...</div>`;
   const stashes = await api.getStashes(repoPath);
   container.innerHTML = `
     <div class="card">
       <h3>Stash</h3>
       <div class="card-row" style="margin-bottom: 16px;">
-        <button class="btn btn-primary compact" id="stash-save-btn">Salvar stash</button>
-        <button class="btn btn-info compact" id="stash-apply-btn" ${stashes.length === 0 ? 'disabled' : ''}>Aplicar</button>
+        <button class="btn btn-primary compact" id="stash-save-btn">Save stash</button>
+        <button class="btn btn-info compact" id="stash-apply-btn" ${stashes.length === 0 ? 'disabled' : ''}>Apply</button>
         <button class="btn btn-success compact" id="stash-pop-btn" ${stashes.length === 0 ? 'disabled' : ''}>Pop</button>
       </div>
       ${
         stashes.length === 0
-          ? '<p class="hint">Nenhum stash.</p>'
+          ? '<p class="hint">No stashes.</p>'
           : stashes
               .map(
                 (s) => `
@@ -592,13 +592,13 @@ async function renderStashTab(container, repoPath) {
   `;
 
   container.querySelector('#stash-save-btn').addEventListener('click', async () => {
-    const message = await promptDialog({ title: 'Salvar stash', label: 'Mensagem (opcional)' });
+    const message = await promptDialog({ title: 'Save stash', label: 'Message (optional)' });
     if (message === null) return;
     try {
       await api.stashSave(repoPath, message);
-      toastSuccess('Stash salvo');
+      toastSuccess('Stash saved');
     } catch (err) {
-      toastError('Erro ao salvar stash', err.message);
+      toastError('Error saving stash', err.message);
     }
     renderStashTab(container, repoPath);
   });
@@ -608,9 +608,9 @@ async function renderStashTab(container, repoPath) {
     applyBtn.addEventListener('click', async () => {
       try {
         await api.stashApply(repoPath, 0);
-        toastSuccess('Stash aplicado');
+        toastSuccess('Stash applied');
       } catch (err) {
-        toastError('Erro ao aplicar stash', err.message);
+        toastError('Error applying stash', err.message);
       }
       renderStashTab(container, repoPath);
     });
@@ -621,9 +621,9 @@ async function renderStashTab(container, repoPath) {
     popBtn.addEventListener('click', async () => {
       try {
         await api.stashPop(repoPath, 0);
-        toastSuccess('Stash aplicado e removido');
+        toastSuccess('Stash applied and dropped');
       } catch (err) {
-        toastError('Erro no stash pop', err.message);
+        toastError('Stash pop error', err.message);
       }
       renderStashTab(container, repoPath);
     });

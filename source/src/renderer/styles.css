@@ -90,7 +90,7 @@ body {
   transition: width 0.18s ease, min-width 0.18s ease;
 }
 
-/* Barra lateral recolhida */
+/* Collapsed sidebar */
 #app.sidebar-collapsed #sidebar {
   width: 0;
   min-width: 0;
@@ -102,7 +102,7 @@ body {
   font-size: 14px;
 }
 
-/* Botão flutuante para reexibir a barra lateral quando recolhida */
+/* Floating button that shows the sidebar again when it is collapsed */
 #expand-sidebar-btn {
   display: none;
   position: absolute;
@@ -132,7 +132,7 @@ body {
   display: flex;
 }
 
-/* Abre espaço pro botão flutuante não cobrir o título/telas quando recolhida */
+/* Makes room so the floating button doesn't cover the title/tabs when collapsed */
 #app.sidebar-collapsed #content .detail-header,
 #app.sidebar-collapsed #content .tabs {
   padding-left: 58px;
@@ -223,7 +223,7 @@ body {
 .project-list {
   flex: 1;
   overflow-y: auto;
-  /* Sem padding no topo: o header sticky gruda rente, sem vão pra conteúdo vazar. */
+  /* No top padding: the sticky header sits flush, with no gap for content to leak through. */
   padding: 0 8px 8px 8px;
 }
 
@@ -238,7 +238,7 @@ body {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.6px;
-  /* Gruda no topo ao rolar, pra recolher o grupo sem precisar voltar lá em cima. */
+  /* Sticks to the top on scroll, so the group can be collapsed without scrolling back up. */
   position: sticky;
   top: 0;
   z-index: 2;
@@ -267,7 +267,7 @@ body {
   border-radius: 8px;
 }
 
-/* Ações do grupo (novo subgrupo / renomear / excluir), visíveis no hover. */
+/* Group actions (new subgroup / rename / delete), visible on hover. */
 .group-actions {
   display: flex;
   gap: 2px;
@@ -280,14 +280,14 @@ body {
   opacity: 1;
 }
 
-/* Aninhamento: filhos indentam com uma linha guia à esquerda. */
+/* Nesting: children indent with a guide line on the left. */
 .group-children {
   margin-left: 9px;
   padding-left: 9px;
   border-left: 1px solid var(--border-strong);
 }
 
-/* Realce da zona de soltura durante o drag & drop. */
+/* Drop zone highlight during drag & drop. */
 .group-node.drag-over > .group-header {
   background: var(--accent-soft);
   border-radius: 8px;
@@ -998,7 +998,7 @@ input:focus, select:focus, textarea:focus {
   margin-top: 16px;
 }
 
-/* Combobox de grupo (selecionar existente ou digitar novo) */
+/* Group combobox (pick an existing one or type a new one) */
 .combo {
   position: relative;
 }
@@ -1170,7 +1170,7 @@ input:focus, select:focus, textarea:focus {
   background: transparent;
 }
 
-/* ---------- Histórico: toggle Lista/Gráfico + grafo ---------- */
+/* ---------- History: List/Graph toggle + graph ---------- */
 
 .history-head {
   align-items: center;
@@ -1272,7 +1272,7 @@ input:focus, select:focus, textarea:focus {
 .ref-badge.tag { background: rgba(251, 191, 36, 0.13); color: var(--warning); }
 .ref-badge.remote { background: rgba(34, 211, 238, 0.12); color: var(--info); }
 
-/* ---------- Responsividade ---------- */
+/* ---------- Responsiveness ---------- */
 
 @media (max-width: 860px) {
   #sidebar { width: 264px; min-width: 200px; }
@@ -1282,7 +1282,7 @@ input:focus, select:focus, textarea:focus {
 }
 
 @media (max-width: 720px) {
-  /* Tela de commit: empilha a lista de arquivos sobre o painel de diff */
+  /* Commit screen: stacks the file list above the diff panel */
   .staging-layout { flex-direction: column; }
   .staging-files {
     width: 100%;
